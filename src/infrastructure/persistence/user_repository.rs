@@ -16,8 +16,8 @@ impl<'a> UserRepository for PostgresUserRepository<'a> {
         use crate::schema::users::dsl::*;
 
         let new_user = NewUser {
-            name: var_name,
-            email: var_email,
+            name: var_name.to_string(),
+            email: var_email.to_string(),
         };
 
         diesel::insert_into(users)
@@ -35,5 +35,19 @@ impl<'a> UserRepository for PostgresUserRepository<'a> {
         use crate::schema::users::dsl::*;
 
         users.load::<User>(self.conn)
+    }
+
+    fn delete_user(&mut self, user_id: i32) -> Result<usize, Error> {
+        use crate::schema::users::dsl::*;
+
+        diesel::delete(users.filter(id.eq(user_id))).execute(self.conn)
+    }
+
+    fn update_user(&mut self, user : User) -> Result<User, Error> {
+        use crate::schema::users::dsl::*;
+
+        diesel::update(users.filter(id.eq(user.id)))
+            .set((name.eq(user.name), email.eq(user.email)))
+            .get_result(self.conn)
     }
 }
