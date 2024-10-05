@@ -19,8 +19,8 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(Logger::default()) // Add the Logger middleware
             .app_data(web::Data::new(pool.clone())) // Pass the pool to the app
-            .configure(routes::users::init) // Initialize user-related routes
-                                            //.configure(routes::posts::init) // Initialize post-related routes
+            .configure(routes::user::init) // Initialize user-related routes
+            .configure(routes::info::init) // Initialize info-related routes
     })
     .bind("127.0.0.1:8080")?
     .run()

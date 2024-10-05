@@ -1,6 +1,6 @@
 use crate::application::services::UserService;
 use crate::infrastructure::persistence::user_repository::PostgresUserRepository;
-use crate::domain::models::NewUser;
+use crate::domain::models::NewUserObject;
 use actix_web::{web, Responder, HttpResponse, Error};
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::PgConnection;
@@ -42,10 +42,10 @@ pub async fn get_user_handler(
 
 pub async fn add_user_handler(
     pool: web::Data<r2d2::Pool<ConnectionManager<PgConnection>>>,
-    query: web::Json<NewUser>,
+    query: web::Json<NewUserObject>,
 ) -> impl Responder {
     with_user_service(&pool, |user_service| {
-        match user_service.create_user(&query.name, &query.email) {
+        match user_service.create_user(query.into_inner()) {
             Ok(user) => Ok(HttpResponse::Ok().json(user)),
             Err(_) => Ok(HttpResponse::InternalServerError().json("Failed to create user!")),
         }
@@ -78,12 +78,12 @@ pub async fn delete_user_handler(
 pub async fn update_user_handler(
     pool: web::Data<r2d2::Pool<ConnectionManager<PgConnection>>>,
     user_id: web::Path<i32>,
-    query: web::Json<NewUser>,
+    query: web::Json<NewUserObject>,
 ) -> impl Responder {
     with_user_service(&pool, |user_service| {
 
         let mut user_to_update = user_service.get_user_by_id(*user_id).unwrap();
-        user_to_update.name = query.name.clone();
+        user_to_update.pseudo = query.pseudo.clone();
         user_to_update.email = query.email.clone();
 
         match user_service.update_user(user_to_update) {
