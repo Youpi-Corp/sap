@@ -1,5 +1,5 @@
-use crate::domain::models::{NewUserObject, UserObject, InfoObject};
-use crate::domain::repository::{UserRepository, InfoRepository};
+use crate::domain::models::{InfoObject, NewUserObject, UserObject};
+use crate::domain::repository::{InfoRepository, UserRepository};
 use diesel::result::Error;
 
 pub struct UserService<'a, T: UserRepository> {
@@ -27,8 +27,11 @@ impl<'a, T: UserRepository> UserService<'a, T> {
         self.user_repo.delete_user(user_id) // Mutably borrow user_repo
     }
 
-    pub fn update_user(&mut self, user : UserObject) -> Result<UserObject, Error> {
+    pub fn update_user(&mut self, user: UserObject) -> Result<UserObject, Error> {
         self.user_repo.update_user(user) // Mutably borrow user_repo
+    }
+    pub fn login(&mut self, email: &str, password: &str) -> Result<String, Error> {
+        self.user_repo.login(email, password)
     }
 }
 
@@ -37,7 +40,6 @@ pub struct InfoService<'a, T: InfoRepository> {
 }
 
 impl<'a, T: InfoRepository> InfoService<'a, T> {
-
     pub fn new(info_repo: &'a mut T) -> Self {
         InfoService { info_repo }
     }

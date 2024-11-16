@@ -7,6 +7,34 @@ mod schema;
 
 use actix_web::{middleware::Logger, web, App, HttpServer};
 use env_logger::Env;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
+
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        // Auth routes
+        routes::auth::login_handler,
+        // User routes
+        routes::user::get_user_handler,
+        routes::user::create_user_handler,
+        routes::user::list_users_handler,
+        routes::user::delete_user_handler,
+        routes::user::update_user_handler
+    ),
+    components(
+        schemas(
+            crate::domain::models::LoginRequest,
+            crate::domain::models::UserObject,
+            crate::domain::models::NewUserObject
+        )
+    ),
+    tags(
+        (name = "Authentication", description = "Auth endpoints"),
+        (name = "Users", description = "User management endpoints")
+    )
+)]
+struct ApiDoc;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -19,8 +47,13 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(Logger::default()) // Add the Logger middleware
             .app_data(web::Data::new(pool.clone())) // Pass the pool to the app
+            .service(
+                SwaggerUi::new("/swagger-ui/{_:.*}")
+                    .url("/api-docs/openapi.json", ApiDoc::openapi()),
+            ) // Add Swagger UI
             .configure(routes::user::init) // Initialize user-related routes
             .configure(routes::info::init) // Initialize info-related routes
+            .configure(routes::auth::init) // Initialize auth-related routes
     })
     .bind("127.0.0.1:8080")?
     .run()

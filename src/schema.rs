@@ -1,5 +1,16 @@
-// @generated automatically by Diesel CLI.
-
+//  @generated automatically by Diesel CLI.
+//    by John Smith
+//
+//  Created:
+//    <l3216PMle>
+//  Last edited:
+//    <l3216PMle>
+//  Auto updated?
+//    No
+//
+//  Description:
+//!   
+//
 diesel::table! {
     asset (id) {
         id -> Int4,
@@ -66,7 +77,7 @@ diesel::table! {
         pseudo -> Nullable<Varchar>,
         #[max_length = 100]
         email -> Nullable<Varchar>,
-        password -> Nullable<Text>,
+        password_hash -> Nullable<Varchar>,
         #[max_length = 4]
         role -> Nullable<Varchar>,
     }
