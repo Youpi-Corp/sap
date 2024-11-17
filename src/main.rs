@@ -43,6 +43,10 @@ async fn main() -> std::io::Result<()> {
 
     let pool = db_connection::establish_connection_pool(); // Create the connection pool
 
+    let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    let bind_address = format!("{}:{}", host, port);
+
     HttpServer::new(move || {
         App::new()
             .wrap(Logger::default()) // Add the Logger middleware
@@ -55,7 +59,7 @@ async fn main() -> std::io::Result<()> {
             .configure(routes::info::init) // Initialize info-related routes
             .configure(routes::auth::init) // Initialize auth-related routes
     })
-    .bind("127.0.0.1:8080")?
+    .bind(bind_address)?
     .run()
     .await
 }
