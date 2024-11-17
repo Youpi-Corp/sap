@@ -2,15 +2,14 @@ use crate::domain::{
     models::{Claims, NewUserObject, UserObject},
     repository::UserRepository,
 };
+use crate::secret::get_secret;
 use diesel::result::Error;
 use diesel::PgConnection;
 use diesel::{
     r2d2::{self, ConnectionManager},
     ExpressionMethods, QueryDsl, RunQueryDsl,
 };
-use dotenvy::dotenv;
 use jsonwebtoken::{encode, EncodingKey, Header};
-use std::env;
 
 pub struct PostgresUserRepository<'a> {
     pub conn: &'a mut r2d2::PooledConnection<ConnectionManager<PgConnection>>,
@@ -112,13 +111,7 @@ impl<'a> UserRepository for PostgresUserRepository<'a> {
     fn login(&mut self, p_email: &str, p_password: &str) -> Result<String, Error> {
         use crate::schema::user::dsl::*;
 
-        // Load environment variables from .env file
-        dotenv().ok();
-        let secret_key = env::var(
-            "
-        JWT_SECRET",
-        )
-        .expect("JWT_SECRET must be set");
+        let secret_key = get_secret("JWT_SECRET").expect("JWT_SECRET must be set");
 
         let result = user
             .filter(email.eq(p_email))

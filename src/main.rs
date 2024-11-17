@@ -4,8 +4,10 @@ mod domain;
 mod infrastructure;
 mod routes;
 mod schema;
+mod secret;
 
 use actix_web::{web::Data, web::ServiceConfig};
+use secret::initialize_secrets;
 use shuttle_actix_web::ShuttleActixWeb;
 use shuttle_runtime::SecretStore;
 use utoipa::OpenApi;
@@ -41,11 +43,12 @@ struct ApiDoc;
 async fn main(
     #[shuttle_runtime::Secrets] secrets: SecretStore,
 ) -> ShuttleActixWeb<impl FnOnce(&mut ServiceConfig) + Send + Clone + 'static> {
+    initialize_secrets(secrets.clone());
+
     let pool = db_connection::establish_connection(); // Create the connection pool
 
     let config = move |cfg: &mut ServiceConfig| {
         cfg.app_data(Data::new(pool.clone())) // Pass the pool to the app
-            .app_data(secrets.clone()) // Pass the secrets to the app
             .service(
                 SwaggerUi::new("/swagger-ui/{_:.*}")
                     .url("/api-docs/openapi.json", ApiDoc::openapi()),
