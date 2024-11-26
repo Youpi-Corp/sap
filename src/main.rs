@@ -49,10 +49,11 @@ async fn main(
 
     let config = move |cfg: &mut ServiceConfig| {
         cfg.app_data(Data::new(pool.clone())) // Pass the pool to the app
-            .service(
-                SwaggerUi::new("/swagger-ui/{_:.*}")
-                    .url("/api-docs/openapi.json", ApiDoc::openapi()),
-            ) // Add Swagger UI
+            .service(SwaggerUi::new("/swagger-ui/{_:.*}").url(
+                "/api-docs/openapi.json
+                    ",
+                ApiDoc::openapi(),
+            )) // Add Swagger UI
             .configure(routes::user::init) // Initialize user-related routes
             .configure(routes::info::init) // Initialize info-related routes
             .configure(routes::auth::init); // Initialize auth-related routes
