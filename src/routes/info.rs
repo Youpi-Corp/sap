@@ -1,4 +1,5 @@
 use crate::application::services::InfoService;
+use crate::domain::models::InfoObject;
 use crate::infrastructure::persistence::info_repository::PostgresInfoRepository;
 use actix_web::{web, Error, HttpResponse, Responder};
 use diesel::r2d2::{self, ConnectionManager};
@@ -24,6 +25,15 @@ where
     f(&mut info_service)
 }
 
+#[utoipa::path(
+    get,
+    path = "/info/get",
+    responses(
+        (status = 200, description = "Info found successfully", body = InfoObject),
+        (status = 404, description = "Info not found")
+    ),
+    tag = "Info"
+)]
 pub async fn get_info_handler(
     pool: web::Data<r2d2::Pool<ConnectionManager<PgConnection>>>,
 ) -> impl Responder {
@@ -33,14 +43,19 @@ pub async fn get_info_handler(
     })
 }
 
+#[utoipa::path(
+    get,
+    path = "/info/alive",
+    responses(
+        (status = 200, description = "I'm alive!", body = String)
+    ),
+    tag = "Info"
+)]
 pub async fn alive_handler() -> impl Responder {
     HttpResponse::Ok().json("I'm alive!")
 }
 
 pub fn init(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::scope("/info")
-            .route("/get", web::get().to(get_info_handler))
-            .route("/alive", web::get().to(alive_handler)),
-    );
+    cfg.route("/get", web::get().to(get_info_handler))
+        .route("/alive", web::get().to(alive_handler));
 }

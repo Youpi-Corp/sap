@@ -35,6 +35,9 @@ where
     params(
         ("user_id" = i32, Path, description = "User ID to fetch")
     ),
+    security(
+        ("bearerAuth" = [])
+    ),
     tag = "Users"
 )]
 pub async fn get_user_handler(
@@ -57,6 +60,9 @@ pub async fn get_user_handler(
         (status = 200, description = "User created successfully", body = UserObject),
         (status = 500, description = "Failed to create user")
     ),
+    security(
+        ("bearerAuth" = [])
+    ),
     tag = "Users"
 )]
 pub async fn create_user_handler(
@@ -78,6 +84,9 @@ pub async fn create_user_handler(
         (status = 200, description = "List of users retrieved successfully", body = Vec<UserObject>),
         (status = 500, description = "Failed to retrieve users")
     ),
+    security(
+        ("bearerAuth" = [])
+    ),
     tag = "Users"
 )]
 pub async fn list_users_handler(
@@ -98,6 +107,9 @@ pub async fn list_users_handler(
     ),
     params(
         ("user_id" = i32, Path, description = "User ID to delete")
+    ),
+    security(
+        ("bearerAuth" = [])
     ),
     tag = "Users"
 )]
@@ -123,6 +135,9 @@ pub async fn delete_user_handler(
     ),
     params(
         ("user_id" = i32, Path, description = "User ID to update")
+    ),
+    security(
+        ("bearerAuth" = [])
     ),
     tag = "Users"
 )]
@@ -157,24 +172,9 @@ pub async fn update_user_handler(
 
 // Register all user-related routes
 pub fn init(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::scope("/user")
-            .route("/create", web::post().to(create_user_handler)) // POST /user/create
-            .route("/get/{user_id}", web::get().to(get_user_handler)) // GET /user/get
-            .route("/list", web::get().to(list_users_handler)) // GET /user/list
-            .route("/delete/{user_id}", web::delete().to(delete_user_handler)) // DELETE /user/delete
-            .route("/update/{user_id}", web::put().to(update_user_handler)), // PUT /user/update
-
-                                                                             //.route("/login", web::post().to(login_user_handler)) // POST /user/login
-                                                                             //.route("/logout", web::post().to(logout_user_handler)) // POST /user/logout
-                                                                             //.route("/forgot-password", web::post().to(forgot_password_handler)) // POST /user/forgot-password
-                                                                             //.route("/reset-password", web::post().to(reset_password_handler)) // POST /user/reset-password
-                                                                             //.route("/report", web::get().to(report_user_handler)) // GET /user/report
-
-                                                                             // sub-scope for role related routes
-                                                                             //.service(
-                                                                             //    web::scope("/role")
-                                                                             //        .route("/get", web::get().to(get_user_role_handler)) // GET /user/role/get
-                                                                             //        .route("/set", web::post().to(set_user_role_handler)), // POST /user/role/set
-    );
+    cfg.route("/create", web::post().to(create_user_handler))
+        .route("/get/{user_id}", web::get().to(get_user_handler))
+        .route("/list", web::get().to(list_users_handler))
+        .route("/delete/{user_id}", web::delete().to(delete_user_handler))
+        .route("/update/{user_id}", web::put().to(update_user_handler));
 }

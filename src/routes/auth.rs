@@ -1,5 +1,5 @@
 use crate::application::services::UserService;
-use crate::domain::models::LoginRequest;
+use crate::domain::models::{LoginRequest, NewUserObject};
 use crate::infrastructure::persistence::user_repository::PostgresUserRepository;
 use actix_web::{web, Error, HttpResponse, Responder};
 use diesel::r2d2::{self, ConnectionManager};
@@ -45,9 +45,30 @@ pub async fn login_handler(
     })
 }
 
+#[utoipa::path(
+    post,
+    path = "/auth/register",
+    request_body = NewUserObject,
+    responses(
+        (status = 201, description = "User successfully registered", body = String),
+        (status = 400, description = "Registration failed")
+    ),
+    tags = ["Authentication"]
+)]
+pub async fn register_handler(
+    pool: web::Data<r2d2::Pool<ConnectionManager<PgConnection>>>,
+    query: web::Json<NewUserObject>,
+) -> impl Responder {
+    with_user_service(&pool, |user_service| {
+        match user_service.create_user(query.into_inner()) {
+            Ok(user) => Ok(HttpResponse::Ok().json(user)),
+            Err(_) => Ok(HttpResponse::InternalServerError().json("Failed to create user!")),
+        }
+    })
+}
+
 // Register all auth-related routes
 pub fn init(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::scope("/auth").route("/login", web::post().to(login_handler)), // POST /auth/login
-    );
+    cfg.route("/login", web::post().to(login_handler))
+        .route("/register", web::post().to(register_handler));
 }
