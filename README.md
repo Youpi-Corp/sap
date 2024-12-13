@@ -15,3 +15,7 @@ infrastructure/:
     The infrastructure layer contains adapters for external systems (e.g., the database or external APIs).
     For example, persistence/user_repository.rs would contain the implementation of the user repository trait using Diesel for PostgreSQL.
     This is where the database interaction (Diesel) is implemented, but the rest of your application doesn't depend on these specifics.
+
+
+A swagger-ui is available at:
+https://brainforest-ozct.shuttle.app/swagger-ui/
