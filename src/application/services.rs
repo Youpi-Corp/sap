@@ -15,6 +15,10 @@ impl<'a, T: UserRepository> UserService<'a, T> {
         self.user_repo.get_user_by_id(user_id) // Mutably borrow user_repo
     }
 
+    pub fn get_user_by_email(&mut self, email: &str) -> Result<UserObject, Error> {
+        self.user_repo.get_user_by_email(email) // Mutably borrow user_repo
+    }
+
     pub fn create_user(&mut self, new_user: NewUserObject) -> Result<UserObject, Error> {
         self.user_repo.create_user(new_user) // Mutably borrow user_repo
     }

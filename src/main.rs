@@ -6,7 +6,6 @@ mod routes;
 mod schema;
 mod secret;
 
-use crate::infrastructure::middleware::auth::AuthMiddleware;
 use actix_web::{web, web::Data, web::ServiceConfig};
 use secret::initialize_secrets;
 use shuttle_actix_web::ShuttleActixWeb;
@@ -43,7 +42,9 @@ impl Modify for SecurityAddon {
         routes::auth::login_handler,
         routes::auth::register_handler,
         // User routes
-        routes::user::get_user_handler,
+        routes::user::get_user_by_id_handler,
+        routes::user::get_user_by_email_handler,
+        routes::user::get_email_used_handler,
         routes::user::create_user_handler,
         routes::user::list_users_handler,
         routes::user::delete_user_handler,
@@ -85,11 +86,7 @@ async fn main(
                     .url("/api-docs/openapi.json", ApiDoc::openapi()),
             )
             .service(web::scope("/auth").configure(routes::auth::init))
-            .service(
-                web::scope("/user")
-                    .wrap(AuthMiddleware)
-                    .configure(routes::user::init),
-            )
+            .service(web::scope("/user").configure(routes::user::init))
             .service(web::scope("/info").configure(routes::info::init));
     };
 

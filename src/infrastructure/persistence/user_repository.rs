@@ -19,6 +19,30 @@ impl<'a> UserRepository for PostgresUserRepository<'a> {
     fn create_user(&mut self, new_user: NewUserObject) -> Result<UserObject, Error> {
         use crate::schema::user::dsl::*;
 
+        // Check email existence
+        let existing_email = user
+            .filter(email.eq(&new_user.email))
+            .first::<UserObject>(self.conn);
+
+        if let Ok(_) = existing_email {
+            return Err(Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::UniqueViolation,
+                Box::new("Email already exists".to_string()),
+            ));
+        }
+
+        // Check pseudo existence
+        let existing_pseudo = user
+            .filter(pseudo.eq(&new_user.pseudo))
+            .first::<UserObject>(self.conn);
+
+        if let Ok(_) = existing_pseudo {
+            return Err(Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::UniqueViolation,
+                Box::new("Pseudo already exists".to_string()),
+            ));
+        }
+
         // Hash the password
         let hashed_password = bcrypt::hash(
             new_user.password_hash.as_ref().unwrap(),
@@ -49,6 +73,20 @@ impl<'a> UserRepository for PostgresUserRepository<'a> {
 
         let result = user
             .filter(id.eq(user_id))
+            .select((id, pseudo, email, password_hash, role))
+            .first::<UserObject>(self.conn);
+
+        match result {
+            Ok(user_object) => Ok(user_object),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn get_user_by_email(&mut self, p_email: &str) -> Result<UserObject, Error> {
+        use crate::schema::user::dsl::*;
+
+        let result = user
+            .filter(email.eq(p_email))
             .select((id, pseudo, email, password_hash, role))
             .first::<UserObject>(self.conn);
 
@@ -126,6 +164,7 @@ impl<'a> UserRepository for PostgresUserRepository<'a> {
                     let claims = Claims {
                         sub: user_object.email.unwrap(),
                         exp: 10000000000, // Set expiration as needed
+                        role: user_object.role.unwrap(),
                     };
                     let token = encode(
                         &Header::default(),

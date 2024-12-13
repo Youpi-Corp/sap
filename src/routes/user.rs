@@ -1,5 +1,7 @@
 use crate::application::services::UserService;
 use crate::domain::models::{NewUserObject, UserObject};
+use crate::infrastructure::middleware::auth::AuthMiddleware;
+use crate::infrastructure::middleware::role::{Role, RoleGuard};
 use crate::infrastructure::persistence::user_repository::PostgresUserRepository;
 use actix_web::{web, Error, HttpResponse, Responder};
 use diesel::r2d2::{self, ConnectionManager};
@@ -40,7 +42,7 @@ where
     ),
     tag = "Users"
 )]
-pub async fn get_user_handler(
+pub async fn get_user_by_id_handler(
     pool: web::Data<r2d2::Pool<ConnectionManager<PgConnection>>>,
     user_id: web::Path<i32>,
 ) -> impl Responder {
@@ -170,11 +172,93 @@ pub async fn update_user_handler(
     })
 }
 
-// Register all user-related routes
+#[utoipa::path(
+    get,
+    path = "/user/get_by_email/{email}",
+    responses(
+        (status = 200, description = "User found successfully", body = UserObject),
+        (status = 404, description = "User not found")
+    ),
+    params(
+        ("email" = String, Path, description = "Email to fetch")
+    ),
+    security(
+        ("bearerAuth" = [])
+    ),
+    tag = "Users"
+)]
+pub async fn get_user_by_email_handler(
+    pool: web::Data<r2d2::Pool<ConnectionManager<PgConnection>>>,
+    email: web::Path<String>,
+) -> impl Responder {
+    with_user_service(&pool, |user_service| {
+        match user_service.get_user_by_email(&email.into_inner()) {
+            Ok(user) => Ok(HttpResponse::Ok().json(user)),
+            Err(_) => Ok(HttpResponse::NotFound().json("User not found!")),
+        }
+    })
+}
+
+#[utoipa::path(
+    get,
+    path = "/user/get_email_used/{email}",
+    responses(
+        (status = 200, description = "Email already used", body = String),
+        (status = 404, description = "Email not used")
+    ),
+    params(
+        ("email" = String, Path, description = "Email to check")
+    ),
+    tag = "Users"
+)]
+pub async fn get_email_used_handler(
+    pool: web::Data<r2d2::Pool<ConnectionManager<PgConnection>>>,
+    email: web::Path<String>,
+) -> impl Responder {
+    with_user_service(&pool, |user_service| {
+        match user_service.get_user_by_email(&email.into_inner()) {
+            Ok(_) => Ok(HttpResponse::Ok().json("Email already used")),
+            Err(_) => Ok(HttpResponse::NotFound().json("Email not used")),
+        }
+    })
+}
+
 pub fn init(cfg: &mut web::ServiceConfig) {
-    cfg.route("/create", web::post().to(create_user_handler))
-        .route("/get/{user_id}", web::get().to(get_user_handler))
-        .route("/list", web::get().to(list_users_handler))
-        .route("/delete/{user_id}", web::delete().to(delete_user_handler))
-        .route("/update/{user_id}", web::put().to(update_user_handler));
+    cfg.service(
+        web::resource("/create")
+            .wrap(AuthMiddleware)
+            .wrap(RoleGuard::new(vec![Role::Admin]))
+            .route(web::post().to(create_user_handler)),
+    )
+    .service(
+        web::resource("/get/{user_id}")
+            .wrap(AuthMiddleware)
+            .route(web::get().to(get_user_by_id_handler)),
+    )
+    .service(
+        web::resource("/get_by_email/{email}")
+            .wrap(AuthMiddleware)
+            .route(web::get().to(get_user_by_email_handler)),
+    )
+    .service(
+        web::resource("/list")
+            .wrap(AuthMiddleware)
+            .wrap(RoleGuard::new(vec![Role::Admin]))
+            .route(web::get().to(list_users_handler)),
+    )
+    .service(
+        web::resource("/delete/{user_id}")
+            .wrap(AuthMiddleware)
+            .wrap(RoleGuard::new(vec![Role::Admin]))
+            .route(web::delete().to(delete_user_handler)),
+    )
+    .service(
+        web::resource("/update/{user_id}")
+            .wrap(AuthMiddleware)
+            .route(web::put().to(update_user_handler)),
+    )
+    .route(
+        "/get_email_used/{email}",
+        web::get().to(get_email_used_handler),
+    );
 }
