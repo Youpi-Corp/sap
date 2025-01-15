@@ -6,6 +6,7 @@ mod routes;
 mod schema;
 mod secret;
 
+use actix_cors::Cors;
 use actix_web::{web, web::Data, web::ServiceConfig};
 use secret::initialize_secrets;
 use shuttle_actix_web::ShuttleActixWeb;
@@ -79,15 +80,26 @@ async fn main(
     let pool = db_connection::establish_connection();
 
     let config = move |cfg: &mut ServiceConfig| {
-        cfg.app_data(Data::new(pool.clone()))
-            // Fix: Remove the newline in the URL string and add Swagger UI before the routes
-            .service(
-                SwaggerUi::new("/swagger-ui/{_:.*}")
-                    .url("/api-docs/openapi.json", ApiDoc::openapi()),
-            )
-            .service(web::scope("/auth").configure(routes::auth::init))
-            .service(web::scope("/user").configure(routes::user::init))
-            .service(web::scope("/info").configure(routes::info::init));
+        cfg.service(
+            web::scope("")
+                .wrap(
+                    Cors::default()
+                        .allow_any_origin()
+                        .allow_any_method()
+                        .allow_any_header()
+                        .expose_headers(["content-disposition"])
+                        .supports_credentials()
+                        .max_age(3600),
+                )
+                .app_data(Data::new(pool.clone()))
+                .service(
+                    SwaggerUi::new("/swagger-ui/{_:.*}")
+                        .url("/api-docs/openapi.json", ApiDoc::openapi()),
+                )
+                .service(web::scope("/auth").configure(routes::auth::init))
+                .service(web::scope("/user").configure(routes::user::init))
+                .service(web::scope("/info").configure(routes::info::init)),
+        );
     };
 
     Ok(config.into())
