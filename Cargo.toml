@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 futures = "0.3.31"
-actix-web = { version = "4", features = ["rustls"] }
+actix-web = { version = "4", features = ["rustls", "cookies"] }
 diesel = { version = "2.2.4", features = ["postgres", "r2d2"] }
 dotenvy = "0.15"
 serde = { version = "1.0.215", features = ["derive"] }
@@ -22,3 +22,4 @@ once_cell = "1.20.2"
 rustls = "0.23.19"
 rustls-pemfile = "2.2.0"
 actix-cors = "0.7.0"
+chrono = "0.4.39"

@@ -39,7 +39,7 @@ pub async fn login_handler(
 ) -> impl Responder {
     with_user_service(&pool, |user_service| {
         match user_service.login(&login_request.email, &login_request.password) {
-            Ok(token) => Ok(HttpResponse::Ok().json(token)),
+            Ok(response) => Ok(response), // Now directly returns HttpResponse with cookie
             Err(_) => Ok(HttpResponse::Unauthorized().json("Invalid credentials")),
         }
     })

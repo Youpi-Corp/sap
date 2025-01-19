@@ -4,19 +4,6 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use rand::Rng;
 
-//  ...existing code...
-//    by John Smith
-// 
-//  Created:
-//    <l3474PMle>
-//  Last edited:
-//    <l3474PMle>
-//  Auto updated?
-//    No
-// 
-//  Description:
-//!   
-// 
 impl<'a, T: UserRepository> UserService<'a, T> {
     pub fn generate_tokens(&self, user_id: String) -> Result<TokenResponse, Error> {
         let secret = get_secret("JWT_SECRET").expect("JWT_SECRET must be set");

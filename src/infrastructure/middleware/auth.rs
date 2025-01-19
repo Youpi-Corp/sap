@@ -7,6 +7,8 @@ use actix_web::{
 use futures::future::LocalBoxFuture;
 use jsonwebtoken::{decode, DecodingKey, Validation};
 
+pub const COOKIE_NAME: &str = "auth_token";
+
 pub struct AuthMiddleware;
 
 impl<S> Transform<S, ServiceRequest> for AuthMiddleware
@@ -41,35 +43,32 @@ where
     forward_ready!(service);
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        let auth_header = req.headers().get("Authorization");
+        // Get token from cookie instead of header
+        let token = req.cookie(COOKIE_NAME);
 
-        if let Some(auth_str) = auth_header {
-            if let Ok(auth_token) = auth_str.to_str() {
-                if auth_token.starts_with("Bearer ") {
-                    let token = auth_token[7..].to_string();
-                    let secret = get_secret("JWT_SECRET").expect("JWT_SECRET must be set");
+        if let Some(cookie) = token {
+            let token = cookie.value().to_string();
+            let secret = get_secret("JWT_SECRET").expect("JWT_SECRET must be set");
 
-                    match decode::<Claims>(
-                        &token,
-                        &DecodingKey::from_secret(secret.as_ref()),
-                        &Validation::default(),
-                    ) {
-                        Ok(token_data) => {
-                            req.extensions_mut().insert(token_data.claims);
-                            return Box::pin(self.service.call(req));
-                        }
-                        Err(_) => {
-                            return Box::pin(std::future::ready(Ok(req.into_response(
-                                HttpResponse::Unauthorized().json("Invalid token"),
-                            ))));
-                        }
-                    }
+            match decode::<Claims>(
+                &token,
+                &DecodingKey::from_secret(secret.as_ref()),
+                &Validation::default(),
+            ) {
+                Ok(token_data) => {
+                    req.extensions_mut().insert(token_data.claims);
+                    return Box::pin(self.service.call(req));
+                }
+                Err(_) => {
+                    return Box::pin(std::future::ready(Ok(
+                        req.into_response(HttpResponse::Unauthorized().json("Invalid token"))
+                    )));
                 }
             }
         }
 
         Box::pin(std::future::ready(Ok(req.into_response(
-            HttpResponse::Unauthorized().json("Missing authorization token"),
+            HttpResponse::Unauthorized().json("Missing authentication token"),
         ))))
     }
 }

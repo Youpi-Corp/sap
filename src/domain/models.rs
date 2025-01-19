@@ -57,3 +57,15 @@ pub struct Claims {
     pub exp: usize,
     pub role: String,
 }
+
+#[derive(Serialize)]
+pub struct UserResponse {
+    email: String,
+    role: String,
+}
+
+#[derive(Serialize)]
+pub struct LoginResponse {
+    message: String,
+    user: UserResponse,
+}

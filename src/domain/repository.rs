@@ -1,6 +1,7 @@
 use super::models::InfoObject;
 use super::models::NewUserObject;
 use crate::domain::models::UserObject;
+use actix_web::HttpResponse;
 use diesel::result::Error;
 
 pub trait UserRepository {
@@ -10,7 +11,7 @@ pub trait UserRepository {
     fn get_all_users(&mut self) -> Result<Vec<UserObject>, Error>;
     fn delete_user(&mut self, user_id: i32) -> Result<usize, Error>;
     fn update_user(&mut self, user: UserObject) -> Result<UserObject, Error>;
-    fn login(&mut self, email: &str, password: &str) -> Result<String, Error>;
+    fn login(&mut self, email: &str, password: &str) -> Result<HttpResponse, Error>;
 }
 
 pub trait InfoRepository {

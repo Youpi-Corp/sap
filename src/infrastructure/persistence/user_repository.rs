@@ -2,7 +2,12 @@ use crate::domain::{
     models::{Claims, NewUserObject, UserObject},
     repository::UserRepository,
 };
+use crate::infrastructure::middleware::auth::COOKIE_NAME;
 use crate::secret::get_secret;
+use actix_web::{
+    cookie::{time::Duration, Cookie, SameSite},
+    HttpResponse,
+};
 use diesel::result::Error;
 use diesel::PgConnection;
 use diesel::{
@@ -146,7 +151,7 @@ impl<'a> UserRepository for PostgresUserRepository<'a> {
         }
     }
 
-    fn login(&mut self, p_email: &str, p_password: &str) -> Result<String, Error> {
+    fn login(&mut self, p_email: &str, p_password: &str) -> Result<HttpResponse, Error> {
         use crate::schema::user::dsl::*;
 
         let secret_key = get_secret("JWT_SECRET").expect("JWT_SECRET must be set");
@@ -163,16 +168,29 @@ impl<'a> UserRepository for PostgresUserRepository<'a> {
                 {
                     let claims = Claims {
                         sub: user_object.email.unwrap(),
-                        exp: 10000000000, // Set expiration as needed
+                        exp: (chrono::Utc::now() + chrono::Duration::minutes(15)).timestamp()
+                            as usize,
                         role: user_object.role.unwrap(),
                     };
+
                     let token = encode(
                         &Header::default(),
                         &claims,
                         &EncodingKey::from_secret(secret_key.as_ref()),
                     )
                     .map_err(|_| Error::NotFound)?;
-                    Ok(token)
+
+                    // Create HTTP-only cookie
+                    let cookie = Cookie::build(COOKIE_NAME, token)
+                        .path("/")
+                        .secure(true)
+                        .http_only(true)
+                        .same_site(SameSite::Strict)
+                        .max_age(Duration::minutes(15) as Duration)
+                        .finish();
+
+                    // Return response with cookie
+                    Ok(HttpResponse::Ok().cookie(cookie).finish())
                 } else {
                     Err(Error::NotFound)
                 }

@@ -1,5 +1,6 @@
 use crate::domain::models::{InfoObject, NewUserObject, UserObject};
 use crate::domain::repository::{InfoRepository, UserRepository};
+use actix_web::HttpResponse;
 use diesel::result::Error;
 
 pub struct UserService<'a, T: UserRepository> {
@@ -34,7 +35,7 @@ impl<'a, T: UserRepository> UserService<'a, T> {
     pub fn update_user(&mut self, user: UserObject) -> Result<UserObject, Error> {
         self.user_repo.update_user(user) // Mutably borrow user_repo
     }
-    pub fn login(&mut self, email: &str, password: &str) -> Result<String, Error> {
+    pub fn login(&mut self, email: &str, password: &str) -> Result<HttpResponse, Error> {
         self.user_repo.login(email, password)
     }
 }
