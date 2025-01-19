@@ -6,7 +6,7 @@ use futures::future::LocalBoxFuture;
 use futures::future::{ready, Ready};
 use std::rc::Rc;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Role {
     Learner = 0,
     Teacher = 1,
@@ -19,6 +19,7 @@ pub struct RoleGuard {
     required_roles: Rc<Vec<Role>>,
 }
 
+// Modified Role Guard
 impl RoleGuard {
     pub fn new(roles: Vec<Role>) -> Self {
         RoleGuard {
@@ -26,34 +27,30 @@ impl RoleGuard {
         }
     }
 
-    // Vérifie si le rôle binaire contient les permissions requises
     fn has_required_roles(user_role: &str, required_roles: &[Role]) -> bool {
-        // the user role is a string representation of roles
-        // the string should contain 4 characters, 0 or 1, each representing a role
-        // 0 for no role, 1 for the role
-        // the order of the roles is [Learner, Teacher, Conceptor, Admin]
-        // e.g. "***1" means the user is an Admin
+        println!("Checking roles - User role: {}", user_role); // Debug print
 
-        // check if the user role is a valid binary string
+        // Validate role string format
         if user_role.len() != 4 || !user_role.chars().all(|c| c == '0' || c == '1') {
+            println!("Invalid role format"); // Debug print
             return false;
         }
 
-        // if the user role contains the admin role, it has all the permissions
-        if user_role.chars().last().unwrap() == '1' {
+        // Admin check
+        if user_role.chars().nth(3).unwrap() == '1' {
+            println!("User is admin, access granted"); // Debug print
             return true;
         }
 
-        // check if the user role contains the required roles
-        let mut authorized = false;
-        for role in required_roles {
-            if user_role.chars().nth(*role as usize).unwrap() == '1' {
-                authorized = true;
-                break;
-            }
-        }
+        // Check specific roles
+        let authorized = required_roles.iter().any(|role| {
+            let has_role = user_role.chars().nth(*role as usize).unwrap() == '1';
+            println!("Checking role {:?}: {}", role, has_role); // Debug print
+            has_role
+        });
 
-        return authorized;
+        println!("Final authorization result: {}", authorized); // Debug print
+        authorized
     }
 }
 
@@ -95,9 +92,11 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let is_authorized =
             if let Some(claims) = req.extensions().get::<crate::domain::models::Claims>() {
+                println!("User role: {}", claims.role); // Debug print
                 let user_role = &claims.role;
                 RoleGuard::has_required_roles(user_role, &self.required_roles)
             } else {
+                println!("No claims found"); // Debug print
                 false
             };
 
@@ -115,7 +114,7 @@ where
             {
                 HttpResponse::Forbidden().json("Insufficient permissions")
             } else {
-                HttpResponse::Unauthorized().json("No authentication token found")
+                HttpResponse::Unauthorized().json("Unauthorized")
             };
             Box::pin(std::future::ready(Ok(req.into_response(response))))
         }

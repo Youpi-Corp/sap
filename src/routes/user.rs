@@ -1,7 +1,7 @@
 use crate::application::services::UserService;
 use crate::domain::models::{NewUserObject, UserObject};
-use crate::infrastructure::middleware::auth::AuthMiddleware;
-use crate::infrastructure::middleware::role::{Role, RoleGuard};
+use crate::infrastructure::middleware::auth::AuthenticationGuard as AuthMiddleware;
+use crate::infrastructure::middleware::auth::Role;
 use crate::infrastructure::persistence::user_repository::PostgresUserRepository;
 use actix_web::{web, Error, HttpResponse, Responder};
 use diesel::r2d2::{self, ConnectionManager};
@@ -226,35 +226,32 @@ pub async fn get_email_used_handler(
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::resource("/create")
-            .wrap(AuthMiddleware)
-            .wrap(RoleGuard::new(vec![Role::Admin]))
+            .wrap(AuthMiddleware::with_roles(vec![Role::Admin]))
             .route(web::post().to(create_user_handler)),
     )
     .service(
         web::resource("/get/{user_id}")
-            .wrap(AuthMiddleware)
+            .wrap(AuthMiddleware::new())
             .route(web::get().to(get_user_by_id_handler)),
     )
     .service(
         web::resource("/get_by_email/{email}")
-            .wrap(AuthMiddleware)
+            .wrap(AuthMiddleware::new())
             .route(web::get().to(get_user_by_email_handler)),
     )
     .service(
         web::resource("/list")
-            .wrap(AuthMiddleware)
-            .wrap(RoleGuard::new(vec![Role::Admin]))
+            .wrap(AuthMiddleware::with_roles(vec![Role::Admin]))
             .route(web::get().to(list_users_handler)),
     )
     .service(
         web::resource("/delete/{user_id}")
-            .wrap(AuthMiddleware)
-            .wrap(RoleGuard::new(vec![Role::Admin]))
+            .wrap(AuthMiddleware::with_roles(vec![Role::Admin]))
             .route(web::delete().to(delete_user_handler)),
     )
     .service(
         web::resource("/update/{user_id}")
-            .wrap(AuthMiddleware)
+            .wrap(AuthMiddleware::new())
             .route(web::put().to(update_user_handler)),
     )
     .route(
