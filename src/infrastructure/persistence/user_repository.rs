@@ -185,7 +185,7 @@ impl<'a> UserRepository for PostgresUserRepository<'a> {
                         .path("/")
                         .secure(true)
                         .http_only(true)
-                        .same_site(SameSite::Strict)
+                        .same_site(SameSite::Lax)
                         .max_age(Duration::minutes(15) as Duration)
                         .finish();
 
