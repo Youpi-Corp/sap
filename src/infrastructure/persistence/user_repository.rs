@@ -189,8 +189,8 @@ impl<'a> UserRepository for PostgresUserRepository<'a> {
                         .max_age(Duration::minutes(15) as Duration)
                         .finish();
 
-                    // Return response with cookie
-                    Ok(HttpResponse::Ok().cookie(cookie).finish())
+                    // Return response with cookie and user id
+                    Ok(HttpResponse::Ok().cookie(cookie).json(user_object.id))
                 } else {
                     Err(Error::NotFound)
                 }
