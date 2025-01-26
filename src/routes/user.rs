@@ -1,4 +1,5 @@
 use crate::application::services::UserService;
+use crate::domain::models::Claims;
 use crate::domain::models::{NewUserObject, UserObject};
 use crate::infrastructure::middleware::auth::AuthenticationGuard as AuthMiddleware;
 use crate::infrastructure::middleware::auth::Role;
@@ -223,6 +224,30 @@ pub async fn get_email_used_handler(
     })
 }
 
+#[utoipa::path(
+    get,
+    path = "/user/me",
+    responses(
+        (status = 200, description = "Current user found successfully", body = UserObject),
+        (status = 404, description = "User not found")
+    ),
+    security(
+        ("bearerAuth" = [])
+    ),
+    tag = "Users"
+)]
+pub async fn get_current_user_handler(
+    pool: web::Data<r2d2::Pool<ConnectionManager<PgConnection>>>,
+    claims: web::ReqData<Claims>,
+) -> impl Responder {
+    with_user_service(&pool, |user_service| {
+        match user_service.get_user_by_email(&claims.sub) {
+            Ok(user) => Ok(HttpResponse::Ok().json(user)),
+            Err(_) => Ok(HttpResponse::NotFound().json("User not found!")),
+        }
+    })
+}
+
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::resource("/create")
@@ -253,6 +278,11 @@ pub fn init(cfg: &mut web::ServiceConfig) {
         web::resource("/update/{user_id}")
             .wrap(AuthMiddleware::new())
             .route(web::put().to(update_user_handler)),
+    )
+    .service(
+        web::resource("/me")
+            .wrap(AuthMiddleware::new())
+            .route(web::get().to(get_current_user_handler)),
     )
     .route(
         "/get_email_used/{email}",
