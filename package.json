@@ -1,0 +1,31 @@
+{
+  "name": "brainforest-api",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "NODE_ENV=production bun src/index.ts"
+  },
+  "dependencies": {
+    "@elysiajs/cookie": "^0.8.0",
+    "@elysiajs/cors": "^0.8.0",
+    "@elysiajs/jwt": "^0.8.0",
+    "@elysiajs/swagger": "^0.8.0",
+    "bcryptjs": "^2.4.3",
+    "drizzle-orm": "^0.29.3",
+    "elysia": "^0.8.9",
+    "pg": "^8.11.3",
+    "postgres": "^3.4.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/pg": "^8.10.9",
+    "bun-types": "latest",
+    "dotenv": "^16.3.1",
+    "drizzle-kit": "^0.20.9",
+    "typescript": "^5.3.3"
+  },
+  "trustedDependencies": [
+    "es5-ext"
+  ]
+}
