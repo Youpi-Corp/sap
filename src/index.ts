@@ -41,8 +41,8 @@ const app = new Elysia()
   .use(
     cors({
       origin: "*", // Allow all origins
-      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Allow all methods
-      allowedHeaders: ["Content-Type", "Authorization"], // Allow specific headers
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"], // Allow all methods
+      allowedHeaders: ["Content-Type", "Authorization", "Accept"], // Allow specific headers
       exposedHeaders: ["Content-Type", "Authorization"], // Expose specific headers
       credentials: true, // Allow cookies to be sent
       maxAge: 3600, // Cache preflight response for 1 hour
