@@ -34,9 +34,9 @@ This project follows a clean architecture pattern:
    bun run dev
    ```
 
-5. **Build for production**:
+5. **Start for production**:
    ```bash
-   bun run build
+   bun start
    ```
 
 ## API Documentation
