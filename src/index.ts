@@ -16,18 +16,7 @@ const port = parseInt(process.env.PORT || "8080");
 
 // Create the application with minimal config
 const app = new Elysia()
-  .use(setupErrorHandler())
-  .use(cookie())
-  .use(
-    cors({
-      origin: "*", // Allow all origins
-      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Allow all methods
-      allowedHeaders: ["Content-Type", "Authorization"], // Allow specific headers
-      exposedHeaders: ["Content-Type", "Authorization"], // Expose specific headers
-      credentials: true, // Allow cookies to be sent
-      maxAge: 3600, // Cache preflight response for 1 hour
-    })
-  )
+  // IMPORTANT: Placez Swagger en premier, avant les autres middlewares
   .use(
     swagger({
       path: "/swagger",
@@ -44,6 +33,19 @@ const app = new Elysia()
           { name: "System", description: "System health endpoints" },
         ],
       },
+    })
+  )
+  // Puis ajoutez les autres middlewares
+  .use(setupErrorHandler())
+  .use(cookie())
+  .use(
+    cors({
+      origin: "*", // Allow all origins
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Allow all methods
+      allowedHeaders: ["Content-Type", "Authorization"], // Allow specific headers
+      exposedHeaders: ["Content-Type", "Authorization"], // Expose specific headers
+      credentials: true, // Allow cookies to be sent
+      maxAge: 3600, // Cache preflight response for 1 hour
     })
   )
   .use(setupRoutes)
