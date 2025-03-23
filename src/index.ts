@@ -40,11 +40,6 @@ const app = new Elysia()
   .use(cookie())
   .use(
     cors({
-      origin: true, // Accepte toutes les origines
-      methods: "*",
-      allowedHeaders: "*",
-      exposedHeaders: ["content-disposition"],
-      credentials: true,
       maxAge: 3600,
     })
   )
