@@ -46,7 +46,6 @@ const app = new Elysia()
         "X-Requested-With",
         "Accept",
       ],
-      preflight: false,
       maxAge: 3600,
     })
   )
