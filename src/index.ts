@@ -40,12 +40,12 @@ const app = new Elysia()
   .use(cookie())
   .use(
     cors({
-      origin: "*", // Allow all origins
-      methods: "*", // Allow any method
-      allowedHeaders: "*", // Allow any header
-      exposedHeaders: ["content-disposition"], // Expose content-disposition header
-      credentials: true, // Allow cookies to be sent
-      maxAge: 3600, // Cache preflight response for 1 hour
+      origin: true, // Accepte toutes les origines
+      methods: "*",
+      allowedHeaders: "*",
+      exposedHeaders: ["content-disposition"],
+      credentials: true,
+      maxAge: 3600,
     })
   )
   .use(setupRoutes)
