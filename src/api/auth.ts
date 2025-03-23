@@ -53,7 +53,7 @@ export function setupAuthRoutes() {
             httpOnly: true,
             path: "/",
             maxAge: 900, // 15 minutes
-            sameSite: "lax", // Allow cross-domain use
+            sameSite: "none", // Allow cross-domain use
             // Secure should be true in production but false in development to work on http localhost
             secure: process.env.NODE_ENV === "production",
           });
@@ -183,7 +183,7 @@ export function setupAuthRoutes() {
             httpOnly: true,
             path: "/",
             maxAge: 900, // 15 minutes
-            sameSite: "lax", // Allow cross-domain use
+            sameSite: "none", // Allow cross-domain use
             secure: process.env.NODE_ENV === "production",
           });
 
@@ -232,7 +232,7 @@ export function setupAuthRoutes() {
           httpOnly: true,
           path: "/",
           maxAge: 0, // Expire immediately
-          sameSite: "lax",
+          sameSite: "none", // Allow cross-domain use
           secure: process.env.NODE_ENV === "production",
         });
 
