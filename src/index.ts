@@ -40,6 +40,12 @@ const app = new Elysia()
   .use(cookie())
   .use(
     cors({
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Accept",
+      ],
       maxAge: 3600,
     })
   )
