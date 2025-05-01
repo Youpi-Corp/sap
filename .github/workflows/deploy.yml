@@ -92,10 +92,11 @@ jobs:
             echo "Running database migrations..."
             bun run migrate # Use the new npm script
 
-            # Start or restart the application using PM2 via npm script
-            echo "Starting/Restarting application with PM2 via npm start script..."
-            # Tell PM2 to run the 'start' script from package.json
-            /usr/local/bin/pm2 start npm --name brainforest-api -- run start --update-env
+            # Start or restart the application using PM2
+            echo "Restarting application with PM2..."
+            # Try restarting first, if it fails (e.g., not found), then start it.
+            /usr/local/bin/pm2 restart brainforest-api --update-env || /usr/local/bin/pm2 start npm --name brainforest-api -- run start --update-env
+
             # Add a small delay
             sleep 2
             /usr/local/bin/pm2 save # Save the process list
