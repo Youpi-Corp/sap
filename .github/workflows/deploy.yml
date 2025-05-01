@@ -46,6 +46,9 @@ jobs:
           name: build-artifacts
           path: ./deploy_package # Download to a temporary directory
 
+      - name: List downloaded artifact contents # New step
+        run: ls -la ./deploy_package
+
       - name: Set up SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -58,8 +61,8 @@ jobs:
         run: |
           # Create target directory if it doesn't exist
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ${{ secrets.DEPLOY_PATH }}"
-          # Copy build artifacts (excluding node_modules) to VM
-          scp -o StrictHostKeyChecking=no -r ./deploy_package/* ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}
+          # Copy build artifacts (excluding node_modules) to VM using "."
+          scp -o StrictHostKeyChecking=no -r ./deploy_package/. ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
 
       - name: Install dependencies and Restart application via PM2
         run: |
