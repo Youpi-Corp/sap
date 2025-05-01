@@ -30,7 +30,7 @@ jobs:
           name: build-artifacts
           path: |
             dist/
-            node_modules/
+            # node_modules/  <-- Exclude this line
             package.json
             bun.lockb
             # Add any other files needed for production (e.g., .env.production, static assets)
@@ -58,21 +58,19 @@ jobs:
         run: |
           # Create target directory if it doesn't exist
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ${{ secrets.DEPLOY_PATH }}"
-          # Copy build artifacts to VM
+          # Copy build artifacts (excluding node_modules) to VM
           scp -o StrictHostKeyChecking=no -r ./deploy_package/* ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}
 
-      - name: Restart application service on VM
+      - name: Install dependencies and Restart application service on VM
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
             cd ${{ secrets.DEPLOY_PATH }}
             # Ensure Bun is installed on the VM (should be done manually once)
-            # Example: curl -fsSL https://bun.sh/install | bash
 
-            # Optional: Install only production dependencies on the VM if node_modules wasn't uploaded
-            # or if you prefer a clean install on the target machine.
-            # Make sure to remove node_modules/ from the 'Archive production artifacts' step above if using this.
-            # echo "Installing production dependencies..."
-            # /home/ubuntu/.bun/bin/bun install --production --frozen-lockfile # Adjust path to bun if needed
+            # Install production dependencies directly on the VM
+            echo "Installing production dependencies..."
+            # Ensure the path to bun is correct for the SSH user
+            /home/ubuntu/.bun/bin/bun install --production --frozen-lockfile
 
             # Restart the application using systemd
             echo "Restarting brainforest-api service..."
