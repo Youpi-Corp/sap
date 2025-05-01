@@ -12,9 +12,11 @@ if (!connectionString) {
   process.exit(1);
 }
 
-// Use the relative path from the project root (where the script is expected to run)
-const migrationsPath = "./drizzle";
-console.log(`Using relative migrations path: ${migrationsPath}`); // Log the path being used
+// Calculate the relative path from the script's location (dist/db/) to the drizzle folder (dist/drizzle/)
+const migrationsPath = "../drizzle";
+console.log(
+  `Using relative migrations path from script location: ${migrationsPath}`
+); // Log the path being used
 
 // Create a dedicated connection for migrations
 async function runMigrations() {
@@ -24,7 +26,7 @@ async function runMigrations() {
   const db = drizzle(migrationClient);
 
   try {
-    // Use the relative path for migrationsFolder
+    // Use the adjusted relative path
     await migrate(db, { migrationsFolder: migrationsPath });
     console.log("Migrations completed successfully");
   } catch (error) {
