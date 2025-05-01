@@ -57,32 +57,33 @@ jobs:
       - name: Add known hosts
         run: ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy to VM
+      - name: Deploy to VM # Renamed - Only ensures directory exists now
         run: |
-          # Create target directory if it doesn't exist
+          echo "Ensuring deployment directory exists on VM..."
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ${{ secrets.DEPLOY_PATH }}"
-          # Copy build artifacts (excluding node_modules) to VM using "."
-          scp -o StrictHostKeyChecking=no -r ./deploy_package/. ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
 
-      - name: Install dependencies and Restart application via PM2
+      - name: Sync files and Restart application via PM2 # Renamed and modified
         run: |
+          echo "Syncing files via rsync..."
+          rsync -avz --delete ./deploy_package/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
+
+          echo "Running commands on VM..."
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            echo "Ensuring rsync is installed..."
+            sudo apt-get update && sudo apt-get install -y rsync
+
             echo "Changing directory to ${{ secrets.DEPLOY_PATH }}"
             cd ${{ secrets.DEPLOY_PATH }} || exit 1 # Exit if cd fails
 
             echo "Listing files in current directory:"
             ls -la # List files to verify ecosystem.config.js is present
 
-            # Ensure Bun is installed (should be done manually once)
-
             # Install production dependencies directly on the VM
             echo "Installing production dependencies..."
-            # Use command directly, assuming it's in PATH
             bun install --production --frozen-lockfile
 
             # Start or restart the application using PM2 and the ecosystem file
             echo "Starting/Restarting application with PM2..."
-            # Use the specific path found with 'which pm2'
             /usr/local/bin/pm2 startOrRestart ecosystem.config.js --env production
             /usr/local/bin/pm2 save # Save the process list for resurrection on reboot
             echo "Deployment complete. Application managed by PM2."
