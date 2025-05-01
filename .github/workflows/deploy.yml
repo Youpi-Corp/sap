@@ -31,9 +31,9 @@ jobs:
           path: |
             dist/
             package.json
-            bun.lockb
-            ecosystem.config.js # Add ecosystem config file to artifact
-            # Add any other files needed for production (e.g., .env.production, static assets)
+            bun.lockb           # Ensure bun.lockb is included
+            ecosystem.config.js # Ensure ecosystem.config.js is included
+            # Add any other files needed for production
 
   deploy:
     needs: build
