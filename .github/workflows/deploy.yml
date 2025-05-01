@@ -86,12 +86,12 @@ jobs:
             echo "Installing production dependencies..."
             bun install --production --frozen-lockfile
 
-            # Start or restart the application using PM2 directly
-            echo "Starting/Restarting application with PM2..."
-            # Use pm2 start instead of startOrRestart
-            /usr/local/bin/pm2 start dist/index.js --name brainforest-api --interpreter bun --update-env --no-daemon
-            # Add a small delay to allow PM2 to potentially stabilize or report immediate errors
+            # Start or restart the application using PM2 via npm script
+            echo "Starting/Restarting application with PM2 via npm start script..."
+            # Tell PM2 to run the 'start' script from package.json
+            /usr/local/bin/pm2 start npm --name brainforest-api -- run start --update-env
+            # Add a small delay
             sleep 2
-            /usr/local/bin/pm2 save # Save the process list for resurrection on reboot
+            /usr/local/bin/pm2 save # Save the process list
             echo "Deployment complete. Application managed by PM2."
           EOF
