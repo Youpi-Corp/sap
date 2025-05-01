@@ -64,9 +64,9 @@ jobs:
       - name: Sync files and Restart application via PM2 # Renamed and modified
         env:
           # Make secrets available to the rsync/ssh step
-          PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
-          PROD_JWT_SECRET: ${{ secrets.PROD_JWT_SECRET }}
-          PROD_PORT: ${{ secrets.PROD_PORT }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          PORT: ${{ secrets.PORT }}
         run: |
           echo "Syncing files via rsync..."
           rsync -avz --delete ./deploy_package/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
@@ -78,9 +78,9 @@ jobs:
 
             # Export environment variables for the PM2 process
             export NODE_ENV="production"
-            export PORT="${PROD_PORT:-8080}"
-            export DATABASE_URL="${PROD_DATABASE_URL}"
-            export JWT_SECRET="${PROD_JWT_SECRET}"
+            export PORT="${PORT:-8080}"
+            export DATABASE_URL="${DATABASE_URL}"
+            export JWT_SECRET="${JWT_SECRET}"
 
             # Install production dependencies directly on the VM
             echo "Installing production dependencies..."
