@@ -9,6 +9,7 @@
         "@elysiajs/jwt": "^0.8.0",
         "@elysiajs/swagger": "^0.8.0",
         "bcryptjs": "^2.4.3",
+        "date-fns": "^4.1.0",
         "drizzle-orm": "^0.29.3",
         "elysia": "^0.8.9",
         "pg": "^8.11.3",
@@ -85,6 +86,8 @@
     "copy-anything": ["copy-anything@3.0.5", "", { "dependencies": { "is-what": "^4.1.8" } }, ""],
 
     "d": ["d@1.0.2", "", { "dependencies": { "es5-ext": "^0.10.64", "type": "^2.7.2" } }, ""],
+
+    "date-fns": ["date-fns@4.1.0", "", {}, "sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg=="],
 
     "debug": ["debug@4.4.0", "", { "dependencies": { "ms": "^2.1.3" } }, ""],
 

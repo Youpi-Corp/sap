@@ -5,6 +5,13 @@ import { success, error } from "../utils/response";
 import crypto from "crypto";
 import { cookie } from "@elysiajs/cookie";
 
+// Modified JWT payload to be compatible with Elysia's JWT type requirements
+type JwtPayload = Record<string, string | number> & {
+  sub: string;
+  role: string;
+  exp?: number;
+};
+
 /**
  * Setup auth routes
  */
@@ -24,16 +31,19 @@ export function setupAuthRoutes() {
           // Authenticate user
           const user = await userService.authenticate(email, password);
 
+          // Make sure email exists before using it
+          if (!user.email) {
+            throw new Error("User email is missing");
+          }
+
+          // Get user roles for JWT
+          const userRoles = await userService.getUserRoles(user.id);
+
           // Generate refresh token
           const refreshToken = crypto.randomBytes(32).toString("hex");
           const expiresAt = new Date(
             Date.now() + 7 * 24 * 60 * 60 * 1000
           ).toISOString(); // 7 days
-
-          // Make sure email exists before using it
-          if (!user.email) {
-            throw new Error("User email is missing");
-          }
 
           // Store refresh token
           await userService.storeRefreshToken(
@@ -42,11 +52,13 @@ export function setupAuthRoutes() {
             expiresAt
           );
 
-          // Generate JWT - handle null values to match expected types
-          const accessToken = await jwt.sign({
-            sub: user.email, // sub must be string | undefined
-            role: user.role || "1000", // role must be string | number
-          });
+          // Store roles as comma-separated string in JWT
+          const payload: JwtPayload = {
+            sub: user.email,
+            role: userRoles.join(","),
+          };
+
+          const accessToken = await jwt.sign(payload);
 
           // Set cookie with the JWT using the setCookie function
           setCookie("auth_token", accessToken, {
@@ -70,6 +82,7 @@ export function setupAuthRoutes() {
             accessToken,
             refreshToken,
             expiresIn: 900, // 15 minutes
+            roles: userRoles, // Include roles in response
           });
         } catch (err: any) {
           // Set correct status code for authentication failures
@@ -147,54 +160,50 @@ export function setupAuthRoutes() {
       async ({ body, jwt, setCookie, set }) => {
         try {
           const { refreshToken } = body as { refreshToken: string };
-
-          // Validate refresh token
           const userId = await userService.validateRefreshToken(refreshToken);
-
-          // Get user
           const user = await userService.getUserByEmail(userId);
 
-          // Generate new refresh token
-          const newRefreshToken = crypto.randomBytes(32).toString("hex");
-          const expiresAt = new Date(
-            Date.now() + 7 * 24 * 60 * 60 * 1000
-          ).toISOString(); // 7 days
-
-          // Make sure email exists before using it
           if (!user.email) {
             throw new Error("User email is missing");
           }
 
-          // Store new refresh token
+          // Get user roles for new JWT
+          const userRoles = await userService.getUserRoles(user.id);
+
+          const newRefreshToken = crypto.randomBytes(32).toString("hex");
+          const expiresAt = new Date(
+            Date.now() + 7 * 24 * 60 * 60 * 1000
+          ).toISOString();
+
           await userService.storeRefreshToken(
             user.email,
             newRefreshToken,
             expiresAt
           );
 
-          // Generate new JWT - handle null values to match expected types
-          const accessToken = await jwt.sign({
-            sub: user.email, // sub must be string | undefined
-            role: user.role || "1000", // role must be string | number
-          });
+          // Store roles as comma-separated string in JWT
+          const payload: JwtPayload = {
+            sub: user.email,
+            role: userRoles.join(","),
+          };
 
-          // Set cookie with the new JWT
+          const accessToken = await jwt.sign(payload);
+
           setCookie("auth_token", accessToken, {
             httpOnly: true,
             path: "/",
-            maxAge: 900, // 15 minutes
-            sameSite: "none", // Allow cross-domain use
+            maxAge: 900,
+            sameSite: "none",
             secure: process.env.NODE_ENV === "production",
           });
 
-          // Return success response
           return success({
             accessToken,
             refreshToken: newRefreshToken,
-            expiresIn: 900, // 15 minutes
+            expiresIn: 900,
+            roles: userRoles, // Include roles in response
           });
         } catch (err: any) {
-          // Set correct status code for token errors
           set.status = 401;
           return error(err.message || "Invalid refresh token", 401);
         }

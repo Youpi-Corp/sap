@@ -24,6 +24,10 @@ jobs:
       - name: Build project
         run: bun run build
 
+      # Add step to validate migrations
+      - name: Validate migrations
+        run: bunx drizzle-kit check:pg
+
       - name: Archive production artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -33,6 +37,7 @@ jobs:
             package.json
             bun.lockb
             drizzle/       # Add the drizzle folder containing SQL migrations
+            .env.example
             # Add any other files needed for production
 
   deploy:
@@ -88,14 +93,21 @@ jobs:
             echo "Installing production dependencies..."
             bun install --production --frozen-lockfile
 
+            # Backup the database before migrations
+            echo "Creating database backup..."
+            pg_dump "${DATABASE_URL}" > backup_$(date +%Y%m%d_%H%M%S).sql || echo "Backup failed but continuing..."
+
             # Run database migrations using the compiled script via npm script
             echo "Running database migrations..."
-            bun run migrate # Use the new npm script
+            if ! bun run migrate; then
+              echo "Migration failed! Please check the logs and restore from backup if needed."
+              exit 1
+            fi
 
             # Start or restart the application using PM2
             echo "Restarting application with PM2..."
             # Try restarting first, if it fails (e.g., not found), then start it.
-            /usr/local/bin/pm2 restart brainforest-api --update-env || /usr/local/bin/pm2 start npm --name brainforest-api -- run start --update-env
+            /usr/local/bin/pm2 restart brainforest-api --update-env || /usr/local/bin/pm2 start bun --name brainforest-api -- start
 
             # Add a small delay
             sleep 2

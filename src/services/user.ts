@@ -1,8 +1,15 @@
 import { db } from "../db/client";
-import { users, refreshTokens } from "../db/schema";
-import { eq } from "drizzle-orm";
+import {
+  users,
+  roles,
+  userRoles,
+  permissions,
+  rolePermissions,
+  refreshTokens,
+} from "../db/schema";
+import { eq, and } from "drizzle-orm";
 import { hashPassword, verifyPassword } from "../utils/password";
-import { NotFoundError, ApiError } from "../middleware/error";
+import { NotFoundError, ApiError, ForbiddenError } from "../middleware/error";
 
 // User types
 export interface User {
@@ -10,14 +17,22 @@ export interface User {
   pseudo: string | null;
   email: string | null;
   password_hash: string | null;
-  role: string | null;
+  roles?: string[]; // Array of role names
 }
 
+// Type for creating a new user
 export interface NewUser {
   pseudo?: string | null;
   email?: string | null;
   password?: string | null;
-  role?: string | null;
+  roles?: string[]; // Array of role names
+}
+
+// Type for database insert that matches schema
+interface DbUser {
+  pseudo?: string | null;
+  email?: string | null;
+  password_hash?: string | null;
 }
 
 export interface LoginRequest {
@@ -35,13 +50,28 @@ export class UserService {
   /**
    * Create a new user
    * @param userData User data
+   * @param creatorRoles Roles of the user creating this user
    * @returns Created user
    */
-  async createUser(userData: NewUser): Promise<User> {
-    // Ignore the roles because its a critical security flow, will fix it later
-    // if the userData.role is defined, replace it with 1000 (Learner role)
-    if (userData.role) {
-      userData.role = "1000"; // Default to Learner role
+  async createUser(userData: NewUser, creatorRoles?: string[]): Promise<User> {
+    // Validate roles if provided
+    if (userData.roles && userData.roles.length > 0) {
+      // Only admin can assign roles other than 'learner'
+      if (!creatorRoles?.includes("admin")) {
+        userData.roles = ["learner"]; // Force learner role for non-admin creators
+      }
+
+      // Verify all roles exist
+      const existingRoles = await db
+        .select({ name: roles.name })
+        .from(roles)
+        .where(and(...userData.roles.map((role) => eq(roles.name, role))));
+
+      if (existingRoles.length !== userData.roles.length) {
+        throw new ApiError("Invalid role(s) specified", 400);
+      }
+    } else {
+      userData.roles = ["learner"]; // Default role
     }
 
     // Check if email already exists
@@ -56,22 +86,81 @@ export class UserService {
       }
     }
 
+    // Prepare user data for database insert
+    const dbUser: DbUser = {
+      pseudo: userData.pseudo,
+      email: userData.email,
+    };
+
     // Hash password if provided
-    let userToInsert: any = { ...userData };
     if (userData.password) {
-      userToInsert.password_hash = await hashPassword(userData.password);
-      delete userToInsert.password;
+      dbUser.password_hash = await hashPassword(userData.password);
     }
 
-    // Set default role if not provided
-    if (!userToInsert.role) {
-      userToInsert.role = "1000"; // Default to Learner role
-    }
+    // Start a transaction
+    return await db.transaction(async (tx) => {
+      // Insert user
+      const [user] = await tx.insert(users).values(dbUser).returning();
 
-    // Insert user
-    const result = await db.insert(users).values(userToInsert).returning();
+      // Get role IDs
+      const roleRecords = await tx
+        .select({ id: roles.id })
+        .from(roles)
+        .where(and(...userData.roles!.map((role) => eq(roles.name, role))));
 
-    return result[0];
+      // Insert user roles
+      await tx.insert(userRoles).values(
+        roleRecords.map((role) => ({
+          user_id: user.id,
+          role_id: role.id,
+        }))
+      );
+
+      // Return user with roles
+      return {
+        ...user,
+        roles: userData.roles,
+      };
+    });
+  }
+
+  /**
+   * Get user roles
+   * @param userId User ID
+   * @returns Array of role names
+   */
+  async getUserRoles(userId: number): Promise<string[]> {
+    const result = await db
+      .select({ name: roles.name })
+      .from(userRoles)
+      .innerJoin(roles, eq(userRoles.role_id, roles.id))
+      .where(eq(userRoles.user_id, userId));
+
+    return result.map((r) => r.name);
+  }
+
+  /**
+   * Check if user has permission
+   * @param userId User ID
+   * @param permissionName Permission to check
+   */
+  async hasPermission(
+    userId: number,
+    permissionName: string
+  ): Promise<boolean> {
+    const result = await db
+      .select()
+      .from(userRoles)
+      .innerJoin(
+        rolePermissions,
+        eq(userRoles.role_id, rolePermissions.role_id)
+      )
+      .innerJoin(permissions, eq(rolePermissions.permission_id, permissions.id))
+      .where(
+        and(eq(userRoles.user_id, userId), eq(permissions.name, permissionName))
+      );
+
+    return result.length > 0;
   }
 
   /**
@@ -116,34 +205,84 @@ export class UserService {
    * Update a user
    * @param id User ID
    * @param userData User data to update
+   * @param updaterRoles Roles of the user making the update
    * @returns Updated user
    */
-  async updateUser(id: number, userData: NewUser): Promise<User> {
-    // Ignore the roles because its a critical security flow, will fix it later
-    // if the userData.role is defined, replace it with 1000 (Learner role)
-    if (userData.role) {
-      userData.role = "1000"; // Default to Learner role
+  async updateUser(
+    id: number,
+    userData: NewUser,
+    updaterRoles?: string[]
+  ): Promise<User> {
+    // Get current user roles
+    const currentRoles = await this.getUserRoles(id);
+
+    // Validate role changes
+    if (userData.roles) {
+      // Only admin can modify roles
+      if (!updaterRoles?.includes("admin")) {
+        throw new ForbiddenError("Only administrators can modify roles");
+      }
+
+      // Verify all roles exist
+      const existingRoles = await db
+        .select({ name: roles.name })
+        .from(roles)
+        .where(and(...userData.roles.map((role) => eq(roles.name, role))));
+
+      if (existingRoles.length !== userData.roles.length) {
+        throw new ApiError("Invalid role(s) specified", 400);
+      }
     }
+
+    // Prepare user data for database update
+    const dbUser: DbUser = {
+      pseudo: userData.pseudo,
+      email: userData.email,
+    };
 
     // Hash password if provided
-    let userToUpdate: any = { ...userData };
     if (userData.password) {
-      userToUpdate.password_hash = await hashPassword(userData.password);
-      delete userToUpdate.password;
+      dbUser.password_hash = await hashPassword(userData.password);
     }
 
-    // Update user
-    const result = await db
-      .update(users)
-      .set(userToUpdate)
-      .where(eq(users.id, id))
-      .returning();
+    return await db.transaction(async (tx) => {
+      // Update user
+      const [updatedUser] = await tx
+        .update(users)
+        .set(dbUser)
+        .where(eq(users.id, id))
+        .returning();
 
-    if (result.length === 0) {
-      throw new NotFoundError("User not found");
-    }
+      if (!updatedUser) {
+        throw new NotFoundError("User not found");
+      }
 
-    return result[0];
+      // Update roles if provided
+      if (userData.roles) {
+        // Delete existing roles
+        await tx.delete(userRoles).where(eq(userRoles.user_id, id));
+
+        // Get role IDs
+        const roleRecords = await tx
+          .select({ id: roles.id })
+          .from(roles)
+          .where(and(...userData.roles.map((role) => eq(roles.name, role))));
+
+        // Insert new roles
+        await tx.insert(userRoles).values(
+          roleRecords.map((role) => ({
+            user_id: id,
+            role_id: role.id,
+          }))
+        );
+      }
+
+      // Return updated user with roles
+      return {
+        ...updatedUser,
+        roles: userData.roles || currentRoles,
+      };
+    });
   }
 
   /**

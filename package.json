@@ -10,7 +10,10 @@
     "build:migrate": "bun build ./src/db/migrate.ts --outdir ./dist/db --target bun",
     "build:copy-drizzle": "cp -r ./drizzle ./dist/drizzle",
     "start": "NODE_ENV=production bun dist/index.js",
-    "migrate": "bun run dist/db/migrate.js"
+    "migrate": "bun run dist/db/migrate.js",
+    "migrate:dev": "bun run src/db/migrate.ts",
+    "backup": "bun run scripts/backup.ts",
+    "deploy": "bun run backup && bun run build && bun run migrate"
   },
   "dependencies": {
     "@elysiajs/cookie": "^0.8.0",
@@ -18,6 +21,7 @@
     "@elysiajs/jwt": "^0.8.0",
     "@elysiajs/swagger": "^0.8.0",
     "bcryptjs": "^2.4.3",
+    "date-fns": "^4.1.0",
     "drizzle-orm": "^0.29.3",
     "elysia": "^0.8.9",
     "pg": "^8.11.3",
