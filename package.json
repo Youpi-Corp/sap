@@ -4,10 +4,11 @@
   "type": "module",
   "scripts": {
     "dev": "bun --watch src/index.ts",
-    "build": "bun run build:clean && bun run build:compile && bun run build:migrate",
+    "build": "bun run build:clean && bun run build:compile && bun run build:migrate && bun run build:copy-drizzle",
     "build:clean": "rm -rf dist",
     "build:compile": "bun build ./src/index.ts --outdir ./dist --target bun",
     "build:migrate": "bun build ./src/db/migrate.ts --outdir ./dist/db --target bun",
+    "build:copy-drizzle": "cp -r ./drizzle ./dist/drizzle",
     "start": "NODE_ENV=production bun dist/index.js",
     "migrate": "bun run dist/db/migrate.js"
   },
