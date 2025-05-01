@@ -2,8 +2,6 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import * as dotenv from "dotenv";
-import path from "path"; // Import path
-import { fileURLToPath } from "url"; // Import url for ESM __dirname equivalent
 
 // Load environment variables
 dotenv.config();
@@ -14,12 +12,9 @@ if (!connectionString) {
   process.exit(1);
 }
 
-// Calculate absolute path to the drizzle folder
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-// Assumes migrate.ts is in src/db, adjusts path to go up two levels to the project root then into drizzle
-const migrationsPath = path.resolve(__dirname, "..", "..", "drizzle");
-console.log(`Looking for migrations in: ${migrationsPath}`); // Add log for debugging
+// Use the relative path from the project root (where the script is expected to run)
+const migrationsPath = "./drizzle";
+console.log(`Using relative migrations path: ${migrationsPath}`); // Log the path being used
 
 // Create a dedicated connection for migrations
 async function runMigrations() {
@@ -29,7 +24,7 @@ async function runMigrations() {
   const db = drizzle(migrationClient);
 
   try {
-    // Use the absolute path for migrationsFolder
+    // Use the relative path for migrationsFolder
     await migrate(db, { migrationsFolder: migrationsPath });
     console.log("Migrations completed successfully");
   } catch (error) {
