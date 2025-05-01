@@ -88,8 +88,10 @@ jobs:
 
             # Start or restart the application using PM2 directly
             echo "Starting/Restarting application with PM2..."
-            # Use --update-env to make PM2 pick up exported variables
-            /usr/local/bin/pm2 startOrRestart dist/index.js --name brainforest-api --interpreter bun --update-env
+            # Use pm2 start instead of startOrRestart
+            /usr/local/bin/pm2 start dist/index.js --name brainforest-api --interpreter bun --update-env --no-daemon
+            # Add a small delay to allow PM2 to potentially stabilize or report immediate errors
+            sleep 2
             /usr/local/bin/pm2 save # Save the process list for resurrection on reboot
             echo "Deployment complete. Application managed by PM2."
           EOF
