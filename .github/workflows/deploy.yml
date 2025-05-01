@@ -38,6 +38,7 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    environment: Production # Add this line to target the Production environment
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
