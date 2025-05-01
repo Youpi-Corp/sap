@@ -38,6 +38,12 @@ export class UserService {
    * @returns Created user
    */
   async createUser(userData: NewUser): Promise<User> {
+    // Ignore the roles because its a critical security flow, will fix it later
+    // if the userData.role is defined, replace it with 1000 (Learner role)
+    if (userData.role) {
+      userData.role = "1000"; // Default to Learner role
+    }
+
     // Check if email already exists
     if (userData.email) {
       const existingUser = await db
@@ -113,6 +119,12 @@ export class UserService {
    * @returns Updated user
    */
   async updateUser(id: number, userData: NewUser): Promise<User> {
+    // Ignore the roles because its a critical security flow, will fix it later
+    // if the userData.role is defined, replace it with 1000 (Learner role)
+    if (userData.role) {
+      userData.role = "1000"; // Default to Learner role
+    }
+
     // Hash password if provided
     let userToUpdate: any = { ...userData };
     if (userData.password) {
