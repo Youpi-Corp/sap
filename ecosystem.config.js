@@ -9,10 +9,11 @@ module.exports = {
       env_production: {
         // Environment variables for production
         NODE_ENV: "production",
-        PORT: 8080, // Or your desired production port
-        DATABASE_URL:
-          "postgres://brainforestadm:YoUpIfOrEsT842@localhost:5432/prod", // Your VM DB connection string
-        JWT_SECRET: "youpicacaproutepipi8882", // Your production JWT secret
+        // Read PORT from VM environment, default to 8080 if not set
+        PORT: process.env.PORT || 8080,
+        // Read DATABASE_URL and JWT_SECRET directly from VM environment
+        DATABASE_URL: process.env.DATABASE_URL,
+        JWT_SECRET: process.env.JWT_SECRET,
       },
       // You can add other environments like env_development if needed
     },

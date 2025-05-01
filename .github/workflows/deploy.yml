@@ -65,17 +65,17 @@ jobs:
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
             cd ${{ secrets.DEPLOY_PATH }}
-            # Ensure Bun is installed on the VM (should be done manually once)
+            # Ensure Bun is installed (should be done manually once)
 
             # Install production dependencies directly on the VM
             echo "Installing production dependencies..."
-            # Ensure the path to bun is correct for the SSH user
-            /home/ubuntu/.bun/bin/bun install --production --frozen-lockfile
+            # Use command directly, assuming it's in PATH
+            bun install --production --frozen-lockfile
 
             # Start or restart the application using PM2 and the ecosystem file
             echo "Starting/Restarting application with PM2..."
-            # Ensure the path to pm2 is correct (usually in ~/.bun/bin or similar)
-            /home/ubuntu/.bun/bin/pm2 startOrRestart ecosystem.config.js --env production
-            /home/ubuntu/.bun/bin/pm2 save # Save the process list for resurrection on reboot
+            # Use the specific path found with 'which pm2'
+            /usr/local/bin/pm2 startOrRestart ecosystem.config.js --env production
+            /usr/local/bin/pm2 save # Save the process list for resurrection on reboot
             echo "Deployment complete. Application managed by PM2."
           EOF
