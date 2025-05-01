@@ -32,6 +32,7 @@ jobs:
             dist/
             package.json
             bun.lockb
+            drizzle/       # Add the drizzle folder containing SQL migrations
             # Add any other files needed for production
 
   deploy:
@@ -69,6 +70,7 @@ jobs:
           PORT: ${{ secrets.PORT }}
         run: |
           echo "Syncing files via rsync..."
+          # Ensure rsync copies the drizzle folder too
           rsync -avz --delete ./deploy_package/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
 
           echo "Running commands on VM..."
@@ -85,6 +87,10 @@ jobs:
             # Install production dependencies directly on the VM
             echo "Installing production dependencies..."
             bun install --production --frozen-lockfile
+
+            # Run database migrations using the compiled script via npm script
+            echo "Running database migrations..."
+            bun run migrate # Use the new npm script
 
             # Start or restart the application using PM2 via npm script
             echo "Starting/Restarting application with PM2 via npm start script..."
