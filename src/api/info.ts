@@ -30,10 +30,34 @@ export function setupInfoRoutes() {
             tags: ["Info"],
             summary: "Get platform information",
             description:
-              "Retrieve general information about the platform including terms and legal notices",
+              "Retrieve general platform information including terms and conditions and legal mentions",
             responses: {
               "200": {
                 description: "Information retrieved successfully",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        success: { type: "boolean", example: true },
+                        data: {
+                          type: "object",
+                          properties: {
+                            cgu: {
+                              type: "string",
+                              description: "Terms and conditions",
+                            },
+                            legal_mentions: {
+                              type: "string",
+                              description: "Legal mentions",
+                            },
+                          },
+                        },
+                        statusCode: { type: "integer", example: 200 },
+                      },
+                    },
+                  },
+                },
               },
               "404": {
                 description: "Information not found",

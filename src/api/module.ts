@@ -17,7 +17,11 @@ export function setupModuleRoutes() {
       .get(
         "/list",
         async ({ guardRoles, set }) => {
-          const authResult = guardRoles([Role.Learner, Role.Teacher, Role.Admin]);
+          const authResult = guardRoles([
+            Role.Learner,
+            Role.Teacher,
+            Role.Admin,
+          ]);
           if (authResult) {
             set.status = authResult.statusCode;
             return authResult;
@@ -50,7 +54,11 @@ export function setupModuleRoutes() {
       .get(
         "/get/:moduleId",
         async ({ params, guardRoles, set }) => {
-          const authResult = guardRoles([Role.Learner, Role.Teacher, Role.Admin]);
+          const authResult = guardRoles([
+            Role.Learner,
+            Role.Teacher,
+            Role.Admin,
+          ]);
           if (authResult) {
             set.status = authResult.statusCode;
             return authResult;
@@ -130,7 +138,10 @@ export function setupModuleRoutes() {
           }
 
           const moduleId = parseInt(params.moduleId, 10);
-          const updatedModule = await moduleService.updateModule(moduleId, body);
+          const updatedModule = await moduleService.updateModule(
+            moduleId,
+            body
+          );
           return success(updatedModule);
         },
         {
