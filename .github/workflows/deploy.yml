@@ -30,9 +30,9 @@ jobs:
           name: build-artifacts
           path: |
             dist/
-            # node_modules/  <-- Exclude this line
             package.json
             bun.lockb
+            ecosystem.config.js # Add ecosystem config file to artifact
             # Add any other files needed for production (e.g., .env.production, static assets)
 
   deploy:
@@ -61,7 +61,7 @@ jobs:
           # Copy build artifacts (excluding node_modules) to VM
           scp -o StrictHostKeyChecking=no -r ./deploy_package/* ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}
 
-      - name: Install dependencies and Restart application service on VM
+      - name: Install dependencies and Restart application via PM2
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
             cd ${{ secrets.DEPLOY_PATH }}
@@ -72,8 +72,10 @@ jobs:
             # Ensure the path to bun is correct for the SSH user
             /home/ubuntu/.bun/bin/bun install --production --frozen-lockfile
 
-            # Restart the application using systemd
-            echo "Restarting brainforest-api service..."
-            sudo systemctl restart brainforest-api.service
-            echo "Deployment complete. Service restarted."
+            # Start or restart the application using PM2 and the ecosystem file
+            echo "Starting/Restarting application with PM2..."
+            # Ensure the path to pm2 is correct (usually in ~/.bun/bin or similar)
+            /home/ubuntu/.bun/bin/pm2 startOrRestart ecosystem.config.js --env production
+            /home/ubuntu/.bun/bin/pm2 save # Save the process list for resurrection on reboot
+            echo "Deployment complete. Application managed by PM2."
           EOF
