@@ -4,7 +4,10 @@
   "type": "module",
   "scripts": {
     "dev": "bun --watch src/index.ts",
-    "start": "NODE_ENV=production bun src/index.ts"
+    "build": "bun run build:clean && bun run build:compile",
+    "build:clean": "rm -rf dist",
+    "build:compile": "bun build ./src/index.ts --outdir ./dist --target bun",
+    "start": "NODE_ENV=production bun dist/index.js"
   },
   "dependencies": {
     "@elysiajs/cookie": "^0.8.0",

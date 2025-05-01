@@ -1,0 +1,80 @@
+# filepath: d:\Github\Brainforest\sap\.github\workflows\deploy.yml
+name: Deploy Backend to VM
+
+on:
+  push:
+    branches:
+      - main # Or your deployment branch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest # Or lock to a specific version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build project
+        run: bun run build
+
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            dist/
+            node_modules/
+            package.json
+            bun.lockb
+            # Add any other files needed for production (e.g., .env.production, static assets)
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: ./deploy_package # Download to a temporary directory
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add known hosts
+        run: ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to VM
+        run: |
+          # Create target directory if it doesn't exist
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ${{ secrets.DEPLOY_PATH }}"
+          # Copy build artifacts to VM
+          scp -o StrictHostKeyChecking=no -r ./deploy_package/* ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}
+
+      - name: Restart application service on VM
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            cd ${{ secrets.DEPLOY_PATH }}
+            # Ensure Bun is installed on the VM (should be done manually once)
+            # Example: curl -fsSL https://bun.sh/install | bash
+
+            # Optional: Install only production dependencies on the VM if node_modules wasn't uploaded
+            # or if you prefer a clean install on the target machine.
+            # Make sure to remove node_modules/ from the 'Archive production artifacts' step above if using this.
+            # echo "Installing production dependencies..."
+            # /home/ubuntu/.bun/bin/bun install --production --frozen-lockfile # Adjust path to bun if needed
+
+            # Restart the application using systemd
+            echo "Restarting brainforest-api service..."
+            sudo systemctl restart brainforest-api.service
+            echo "Deployment complete. Service restarted."
+          EOF
