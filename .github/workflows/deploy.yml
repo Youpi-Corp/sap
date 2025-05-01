@@ -64,7 +64,12 @@ jobs:
       - name: Install dependencies and Restart application via PM2
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-            cd ${{ secrets.DEPLOY_PATH }}
+            echo "Changing directory to ${{ secrets.DEPLOY_PATH }}"
+            cd ${{ secrets.DEPLOY_PATH }} || exit 1 # Exit if cd fails
+
+            echo "Listing files in current directory:"
+            ls -la # List files to verify ecosystem.config.js is present
+
             # Ensure Bun is installed (should be done manually once)
 
             # Install production dependencies directly on the VM
