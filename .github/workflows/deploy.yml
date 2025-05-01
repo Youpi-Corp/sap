@@ -31,8 +31,7 @@ jobs:
           path: |
             dist/
             package.json
-            bun.lockb           # Ensure bun.lockb is included
-            ecosystem.config.js # Ensure ecosystem.config.js is included
+            bun.lockb
             # Add any other files needed for production
 
   deploy:
@@ -63,28 +62,34 @@ jobs:
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ${{ secrets.DEPLOY_PATH }}"
 
       - name: Sync files and Restart application via PM2 # Renamed and modified
+        env:
+          # Make secrets available to the rsync/ssh step
+          PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          PROD_JWT_SECRET: ${{ secrets.PROD_JWT_SECRET }}
+          PROD_PORT: ${{ secrets.PROD_PORT }}
         run: |
           echo "Syncing files via rsync..."
           rsync -avz --delete ./deploy_package/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
 
           echo "Running commands on VM..."
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-            echo "Ensuring rsync is installed..."
-            sudo apt-get update && sudo apt-get install -y rsync
-
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << EOF
             echo "Changing directory to ${{ secrets.DEPLOY_PATH }}"
             cd ${{ secrets.DEPLOY_PATH }} || exit 1 # Exit if cd fails
 
-            echo "Listing files in current directory:"
-            ls -la # List files to verify ecosystem.config.js is present
+            # Export environment variables for the PM2 process
+            export NODE_ENV="production"
+            export PORT="${PROD_PORT:-8080}"
+            export DATABASE_URL="${PROD_DATABASE_URL}"
+            export JWT_SECRET="${PROD_JWT_SECRET}"
 
             # Install production dependencies directly on the VM
             echo "Installing production dependencies..."
             bun install --production --frozen-lockfile
 
-            # Start or restart the application using PM2 and the ecosystem file
+            # Start or restart the application using PM2 directly
             echo "Starting/Restarting application with PM2..."
-            /usr/local/bin/pm2 startOrRestart ecosystem.config.js --env production
+            # Use --update-env to make PM2 pick up exported variables
+            /usr/local/bin/pm2 startOrRestart dist/index.js --name brainforest-api --interpreter bun --update-env
             /usr/local/bin/pm2 save # Save the process list for resurrection on reboot
             echo "Deployment complete. Application managed by PM2."
           EOF
