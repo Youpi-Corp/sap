@@ -31,6 +31,7 @@ const app = new Elysia()
           { name: "Users", description: "User management endpoints" },
           { name: "Info", description: "Info endpoints" },
           { name: "System", description: "System health endpoints" },
+          { name: "Courses", description: "Course management endpoints" },
         ],
       },
     })
