@@ -100,13 +100,21 @@ export function setupAuthRoutes() {
     .post(
       "/register",
       async ({ body, set }) => {
+
+        console.log("Registering user with body:", body);
+
         try {
           // Create user
           const user = await userService.createUser(body);
 
+          console.log("User created:", user);
+
           set.status = 201;
           return success(user, 201);
         } catch (err: any) {
+
+          console.error("Error creating user:", err);
+
           // Set appropriate status code based on error
           if (err.message && err.message.includes("already in use")) {
             set.status = 409;
