@@ -50,6 +50,13 @@ const app = new Elysia()
       maxAge: 3600,
     })
   )
+  // Add request logging middleware
+  .onRequest(({ request }) => {
+    const timestamp = new Date().toISOString();
+    const method = request.method;
+    const url = request.url;
+    console.log(`[${timestamp}] ${method} ${url}`);
+  })
   .use(setupRoutes)
   .get("/health", () => {
     return success({
