@@ -55,7 +55,7 @@ export function setupAuthRoutes() {
             maxAge: 900, // 15 minutes
             sameSite: "none", // Allow cross-domain use
             // Secure should be true in production but false in development to work on http localhost
-            secure: process.env.NODE_ENV === "production",
+            secure: true,
           });
 
           console.log(
@@ -188,7 +188,7 @@ export function setupAuthRoutes() {
             path: "/",
             maxAge: 900, // 15 minutes
             sameSite: "none", // Allow cross-domain use
-            secure: process.env.NODE_ENV === "production",
+            secure: true,
           });
 
           // Return success response
@@ -237,7 +237,7 @@ export function setupAuthRoutes() {
           path: "/",
           maxAge: 0, // Expire immediately
           sameSite: "none", // Allow cross-domain use
-          secure: process.env.NODE_ENV === "production",
+          secure: true,
         });
 
         return success({ message: "Logged out successfully" });
