@@ -5,10 +5,10 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "build": "bun run build:clean && bun run build:compile && bun run build:migrate && bun run build:copy-drizzle",
-    "build:clean": "rm -rf dist",
+    "build:clean": "rimraf dist",
     "build:compile": "bun build ./src/index.ts --outdir ./dist --target bun",
     "build:migrate": "bun build ./src/db/migrate.ts --outdir ./dist/db --target bun",
-    "build:copy-drizzle": "cp -r ./drizzle ./dist/drizzle",
+    "build:copy-drizzle": "copyfiles -u 1 \"drizzle/**/*\" dist",
     "start": "NODE_ENV=production bun dist/index.js",
     "migrate": "bun run dist/db/migrate.js"
   },
@@ -27,8 +27,10 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/pg": "^8.10.9",
     "bun-types": "latest",
+    "copyfiles": "^2.4.1",
     "dotenv": "^16.3.1",
     "drizzle-kit": "^0.20.9",
+    "rimraf": "^6.0.1",
     "typescript": "^5.3.3"
   },
   "trustedDependencies": [
