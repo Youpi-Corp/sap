@@ -101,13 +101,9 @@ export function setupAuthRoutes() {
       "/register",
       async ({ body, set }) => {
 
-        console.log("Registering user with body:", body);
-
         try {
           // Create user
           const user = await userService.createUser(body);
-
-          console.log("User created:", user);
 
           set.status = 201;
           return success(user, 201);
