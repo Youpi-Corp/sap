@@ -47,7 +47,7 @@ export function setupCourseRoutes() {
       )
       // Get course by ID
       .get(
-        "/get/:courseId",
+        "/get/:id",
         async ({ params, guardRoles, set }) => {
           const authResult = guardRoles([Role.Learner, Role.Teacher, Role.Admin]);
           if (authResult) {
@@ -55,8 +55,8 @@ export function setupCourseRoutes() {
             return authResult;
           }
 
-          const courseId = parseInt(params.courseId, 10);
-          const course = await courseService.getCourseById(courseId);
+          const id = params.id;
+          const course = await courseService.getCourseById(id);
           return success(course);
         },
         {
@@ -122,7 +122,7 @@ export function setupCourseRoutes() {
       )
       // Update a course (Admin or Teacher only)
       .put(
-        "/update/:courseId",
+        "/update/:id",
         async ({ params, body, guardRoles, set }) => {
           const authResult = guardRoles([Role.Teacher, Role.Admin]);
           if (authResult) {
@@ -130,8 +130,8 @@ export function setupCourseRoutes() {
             return authResult;
           }
 
-          const courseId = parseInt(params.courseId, 10);
-          const updatedCourse = await courseService.updateCourse(courseId, body);
+          const id = params.id;
+          const updatedCourse = await courseService.updateCourse(id, body);
           return success(updatedCourse);
         },
         {
@@ -166,7 +166,7 @@ export function setupCourseRoutes() {
       )
       // Delete a course (Admin only)
       .delete(
-        "/delete/:courseId",
+        "/delete/:id",
         async ({ params, guardRoles, set }) => {
           const authResult = guardRoles([Role.Admin]);
           if (authResult) {
@@ -174,8 +174,8 @@ export function setupCourseRoutes() {
             return authResult;
           }
 
-          const courseId = parseInt(params.courseId, 10);
-          await courseService.deleteCourse(courseId);
+          const id = params.id;
+          await courseService.deleteCourse(id);
           return success({ message: "Course deleted" });
         },
         {

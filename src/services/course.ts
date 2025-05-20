@@ -1,92 +1,121 @@
-import { db } from "../db/client";
-import { courses } from "../db/schema";
-import { eq } from "drizzle-orm";
+import { CourseModel, ICourse } from "../db/schema"; // Updated import
 import { NotFoundError, ApiError } from "../middleware/error";
+import mongoose from 'mongoose'; // Import mongoose for ObjectId
 
-// Course types
-export interface Course {
-  id: number;
+export interface NewCourse { // This can be a subset of ICourse for creation
   name: string;
   content: string;
-  module_id: number;
-  level: number;
-  likes: number;
-  views: number;
-  public: boolean;
-  chat_id: number | null;
-}
-
-export interface NewCourse {
-  name: string;
-  content: string;
-  module_id: number;
-  level: number;
-  public: boolean;
+  module_id: mongoose.Schema.Types.ObjectId | string;
+  level?: number;
+  likes?: number;
+  views?: number;
+  public?: boolean;
+  chat_id?: mongoose.Schema.Types.ObjectId | string | null;
 }
 
 export class CourseService {
-  /**
-   * Get all courses
-   * @returns Array of courses
-   */
-  async getAllCourses(): Promise<Course[]> {
-    return await db.select().from(courses);
-  }
-
-  /**
-   * Get a course by ID
-   * @param id Course ID
-   * @returns Course
-   */
-  async getCourseById(id: number): Promise<Course> {
-    const result = await db.select().from(courses).where(eq(courses.id, id));
-
-    if (result.length === 0) {
-      throw new NotFoundError("Course not found");
-    }
-
-    return result[0];
-  }
-
   /**
    * Create a new course
    * @param courseData Course data
    * @returns Created course
    */
-  async createCourse(courseData: NewCourse): Promise<Course> {
-    const result = await db.insert(courses).values(courseData).returning();
-    return result[0];
+  async createCourse(courseData: NewCourse): Promise<ICourse> {
+    const newCourse = new CourseModel(courseData);
+    await newCourse.save();
+    return newCourse;
+  }
+
+  /**
+   * Get a course by ID
+   * @param id Course ID (string for MongoDB ObjectId)
+   * @returns Course
+   */
+  async getCourseById(id: string): Promise<ICourse> {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ApiError("Invalid course ID format", 400);
+    }
+    const course = await CourseModel.findById(id);
+
+    if (!course) {
+      throw new NotFoundError("Course not found");
+    }
+
+    return course;
+  }
+
+  /**
+   * Get all courses
+   * @returns Array of courses
+   */
+  async getAllCourses(): Promise<ICourse[]> {
+    return await CourseModel.find();
   }
 
   /**
    * Update a course
-   * @param id Course ID
+   * @param id Course ID (string for MongoDB ObjectId)
    * @param courseData Course data to update
    * @returns Updated course
    */
-  async updateCourse(id: number, courseData: Partial<NewCourse>): Promise<Course> {
-    const result = await db
-      .update(courses)
-      .set(courseData)
-      .where(eq(courses.id, id))
-      .returning();
+  async updateCourse(id: string, courseData: Partial<NewCourse>): Promise<ICourse> {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ApiError("Invalid course ID format", 400);
+    }
+    const updatedCourse = await CourseModel.findByIdAndUpdate(id, courseData, { new: true });
 
-    if (result.length === 0) {
+    if (!updatedCourse) {
       throw new NotFoundError("Course not found");
     }
 
-    return result[0];
+    return updatedCourse;
   }
 
   /**
    * Delete a course
-   * @param id Course ID
+   * @param id Course ID (string for MongoDB ObjectId)
    * @returns True if course was deleted
    */
-  async deleteCourse(id: number): Promise<boolean> {
-    const result = await db.delete(courses).where(eq(courses.id, id)).returning();
+  async deleteCourse(id: string): Promise<boolean> {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ApiError("Invalid course ID format", 400);
+    }
+    const result = await CourseModel.findByIdAndDelete(id);
+    return !!result;
+  }
 
-    return result.length > 0;
+  /**
+   * Get courses by module ID
+   * @param id Module ID (string for MongoDB ObjectId)
+   * @returns Array of courses
+   */
+  async getCoursesByid(id: string): Promise<ICourse[]> {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ApiError("Invalid module ID format", 400);
+    }
+    return await CourseModel.find({ module_id: id });
+  }
+
+  // Add other course-specific methods here, e.g., incrementLikes, incrementViews
+  async incrementLikes(id: string): Promise<ICourse> {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ApiError("Invalid course ID format", 400);
+    }
+    const course = await CourseModel.findByIdAndUpdate(id, { $inc: { likes: 1 } }, { new: true });
+    if (!course) {
+      throw new NotFoundError("Course not found");
+    }
+    return course;
+  }
+
+  async incrementViews(id: string): Promise<ICourse> {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ApiError("Invalid course ID format", 400);
+    }
+    const course = await CourseModel.findByIdAndUpdate(id, { $inc: { views: 1 } }, { new: true });
+    if (!course) {
+      throw new NotFoundError("Course not found");
+    }
+    return course;
   }
 }
 

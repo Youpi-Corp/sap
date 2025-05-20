@@ -4,13 +4,10 @@
   "type": "module",
   "scripts": {
     "dev": "bun --watch src/index.ts",
-    "build": "bun run build:clean && bun run build:compile && bun run build:migrate && bun run build:copy-drizzle",
+    "build": "bun run build:clean && bun run build:compile",
     "build:clean": "rimraf dist",
     "build:compile": "bun build ./src/index.ts --outdir ./dist --target bun",
-    "build:migrate": "bun build ./src/db/migrate.ts --outdir ./dist/db --target bun",
-    "build:copy-drizzle": "copyfiles -u 1 \"drizzle/**/*\" dist",
-    "start": "NODE_ENV=production bun dist/index.js",
-    "migrate": "bun run dist/db/migrate.js"
+    "start": "NODE_ENV=production bun dist/index.js"
   },
   "dependencies": {
     "@elysiajs/cookie": "^0.8.0",
@@ -18,18 +15,13 @@
     "@elysiajs/jwt": "^0.8.0",
     "@elysiajs/swagger": "^0.8.0",
     "bcryptjs": "^2.4.3",
-    "drizzle-orm": "^0.29.3",
     "elysia": "^0.8.9",
-    "pg": "^8.11.3",
-    "postgres": "^3.4.3"
+    "mongoose": "^8.0.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/pg": "^8.10.9",
     "bun-types": "latest",
-    "copyfiles": "^2.4.1",
     "dotenv": "^16.3.1",
-    "drizzle-kit": "^0.20.9",
     "rimraf": "^6.0.1",
     "typescript": "^5.3.3"
   },

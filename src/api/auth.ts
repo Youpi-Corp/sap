@@ -66,7 +66,7 @@ export function setupAuthRoutes() {
           // Return success response
           set.status = 200;
           return success({
-            userId: user.id,
+            id: user.id,
             accessToken,
             refreshToken,
             expiresIn: 900, // 15 minutes
@@ -153,10 +153,10 @@ export function setupAuthRoutes() {
           const { refreshToken } = body as { refreshToken: string };
 
           // Validate refresh token
-          const userId = await userService.validateRefreshToken(refreshToken);
+          const id = await userService.validateRefreshToken(refreshToken);
 
           // Get user
-          const user = await userService.getUserByEmail(userId);
+          const user = await userService.getUserByEmail(id);
 
           // Generate new refresh token
           const newRefreshToken = crypto.randomBytes(32).toString("hex");

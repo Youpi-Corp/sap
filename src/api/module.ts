@@ -48,7 +48,7 @@ export function setupModuleRoutes() {
       )
       // Get module by ID
       .get(
-        "/get/:moduleId",
+        "/get/:id",
         async ({ params, guardRoles, set }) => {
           const authResult = guardRoles([Role.Learner, Role.Teacher, Role.Admin]);
           if (authResult) {
@@ -56,8 +56,8 @@ export function setupModuleRoutes() {
             return authResult;
           }
 
-          const moduleId = parseInt(params.moduleId, 10);
-          const module = await moduleService.getModuleById(moduleId);
+          const id = params.id;
+          const module = await moduleService.getModuleById(id);
           return success(module);
         },
         {
@@ -121,7 +121,7 @@ export function setupModuleRoutes() {
       )
       // Update a module (Admin or Teacher only)
       .put(
-        "/update/:moduleId",
+        "/update/:id",
         async ({ params, body, guardRoles, set }) => {
           const authResult = guardRoles([Role.Teacher, Role.Admin]);
           if (authResult) {
@@ -129,8 +129,8 @@ export function setupModuleRoutes() {
             return authResult;
           }
 
-          const moduleId = parseInt(params.moduleId, 10);
-          const updatedModule = await moduleService.updateModule(moduleId, body);
+          const id = params.id;
+          const updatedModule = await moduleService.updateModule(id, body);
           return success(updatedModule);
         },
         {
@@ -163,7 +163,7 @@ export function setupModuleRoutes() {
       )
       // Delete a module (Admin only)
       .delete(
-        "/delete/:moduleId",
+        "/delete/:id",
         async ({ params, guardRoles, set }) => {
           const authResult = guardRoles([Role.Admin]);
           if (authResult) {
@@ -171,8 +171,8 @@ export function setupModuleRoutes() {
             return authResult;
           }
 
-          const moduleId = parseInt(params.moduleId, 10);
-          await moduleService.deleteModule(moduleId);
+          const id = params.id;
+          await moduleService.deleteModule(id);
           return success({ message: "Module deleted" });
         },
         {

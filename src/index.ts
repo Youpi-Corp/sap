@@ -5,6 +5,7 @@ import { cookie } from "@elysiajs/cookie";
 import { setupRoutes } from "./api";
 import { setupErrorHandler } from "./middleware/error";
 import { success, error } from "./utils/response";
+import { connectToDB } from "./db/client"; // Add this import
 
 // Log startup info
 console.log("Starting server...");
@@ -16,6 +17,11 @@ const port = parseInt(process.env.PORT || "8080");
 
 // Create the application with minimal config
 const app = new Elysia()
+  .onStart(async () => { // Add onStart hook
+    await connectToDB();
+    console.log(`🚀 Server running at http://localhost:${port}`);
+    console.log(`📚 Swagger UI available at http://localhost:${port}/swagger`);
+  })
   // IMPORTANT: Placez Swagger en premier, avant les autres middlewares
   .use(
     swagger({
@@ -82,7 +88,7 @@ const app = new Elysia()
     }
 
     // Other errors
-    console.error(`Error [${code}]:`, error);
+    console.error(`Request Error on path '${path}' [Code: ${code}]:`, error); // Enhanced logging for other errors
     return {
       success: false,
       error: error.message || "Internal Server Error",
@@ -94,9 +100,6 @@ const app = new Elysia()
 console.log(`Starting server with port: ${port}`);
 
 // Start the server
-app.listen(port, () => {
-  console.log(`🚀 Server running at http://localhost:${port}`);
-  console.log(`📚 Swagger UI available at http://localhost:${port}/swagger`);
-});
+app.listen(port); // Simplified listen call
 
 // No default export to avoid double instantiation

@@ -48,7 +48,7 @@ export function setupUserRoutes() {
       )
       // Get user by ID
       .get(
-        "/get/:userId",
+        "/get/:id",
         async ({ params, guard, set }) => {
           // Check authentication
           const authResult = guard();
@@ -58,8 +58,8 @@ export function setupUserRoutes() {
             return authResult;
           }
 
-          const userId = parseInt(params.userId, 10);
-          const user = await userService.getUserById(userId);
+          const id = params.id;
+          const user = await userService.getUserById(id);
           return success(user);
         },
         {
@@ -230,7 +230,7 @@ export function setupUserRoutes() {
       )
       // Delete user (admin only)
       .delete(
-        "/delete/:userId",
+        "/delete/:id",
         async ({ params, guardRoles, set }) => {
           // Check if user has admin role
           const authResult = guardRoles([Role.Admin]);
@@ -240,8 +240,8 @@ export function setupUserRoutes() {
             return authResult;
           }
 
-          const userId = parseInt(params.userId, 10);
-          await userService.deleteUser(userId);
+          const id = params.id;
+          await userService.deleteUser(id);
           return success({ message: "User deleted" });
         },
         {
@@ -269,7 +269,7 @@ export function setupUserRoutes() {
       )
       // Update user
       .put(
-        "/update/:userId",
+        "/update/:id",
         async ({ params, body, user, isAuthenticated, hasRoles, set }) => {
           // Check authentication
           if (!isAuthenticated() || !user) {
@@ -277,8 +277,8 @@ export function setupUserRoutes() {
             return UNAUTHORIZED;
           }
 
-          const userId = parseInt(params.userId, 10);
-          const userData = await userService.getUserById(userId);
+          const id = params.id;
+          const userData = await userService.getUserById(id);
 
           // Check if user is updating their own profile or is an admin
           if (userData.email !== user.sub && !hasRoles([Role.Admin])) {
@@ -286,7 +286,7 @@ export function setupUserRoutes() {
             throw new ForbiddenError("Cannot update other users");
           }
 
-          const updatedUser = await userService.updateUser(userId, body);
+          const updatedUser = await userService.updateUser(id, body);
           return success(updatedUser);
         },
         {

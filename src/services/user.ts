@@ -1,21 +1,12 @@
-import { db } from "../db/client";
-import { users, refreshTokens } from "../db/schema";
-import { eq } from "drizzle-orm";
+import { UserModel, IUser, RefreshTokenModel, IRefreshToken } from "../db/schema"; // Import Mongoose models
 import { hashPassword, verifyPassword } from "../utils/password";
 import { NotFoundError, ApiError } from "../middleware/error";
 
-// User types
-export interface User {
-  id: number;
-  pseudo: string | null;
-  email: string | null;
-  password_hash: string | null;
-  role: string | null;
-}
+export type User = IUser;
 
 export interface NewUser {
   pseudo?: string | null;
-  email?: string | null;
+  email: string;
   password?: string | null;
   role?: string | null;
 }
@@ -32,221 +23,114 @@ export interface TokenData {
 }
 
 export class UserService {
-  /**
-   * Create a new user
-   * @param userData User data
-   * @returns Created user
-   */
-  async createUser(userData: NewUser): Promise<User> {
-    // Ignore the roles because its a critical security flow, will fix it later
-    // if the userData.role is defined, replace it with 1000 (Learner role)
-    if (userData.role) {
-      userData.role = "1000"; // Default to Learner role
-    }
+  async createUser(userData: NewUser): Promise<IUser> {
+    const role = userData.role || "1000";
 
-    // Check if email already exists
     if (userData.email) {
-      const existingUser = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, userData.email));
-
-      if (existingUser.length > 0) {
+      const existingUser = await UserModel.findOne({ email: userData.email.toLowerCase() });
+      if (existingUser) {
         throw new ApiError("Email already in use", 409);
       }
     }
 
-    // Hash password if provided
-    let userToInsert: any = { ...userData };
+    const userToInsertData: Partial<IUser> = {
+      email: userData.email.toLowerCase(),
+      pseudo: userData.pseudo,
+      role: role,
+    };
+
     if (userData.password) {
-      userToInsert.password_hash = await hashPassword(userData.password);
-      delete userToInsert.password;
+      userToInsertData.password_hash = await hashPassword(userData.password);
     }
 
-    // Set default role if not provided
-    if (!userToInsert.role) {
-      userToInsert.role = "1000"; // Default to Learner role
-    }
-
-    // Insert user
-    const result = await db.insert(users).values(userToInsert).returning();
-
-    return result[0];
+    const newUser = new UserModel(userToInsertData);
+    await newUser.save();
+    return newUser;
   }
 
-  /**
-   * Get a user by ID
-   * @param id User ID
-   * @returns User
-   */
-  async getUserById(id: number): Promise<User> {
-    const result = await db.select().from(users).where(eq(users.id, id));
-
-    if (result.length === 0) {
+  async getUserById(id: string): Promise<IUser> {
+    const user = await UserModel.findById(id);
+    if (!user) {
       throw new NotFoundError("User not found");
     }
-
-    return result[0];
+    return user;
   }
 
-  /**
-   * Get a user by email
-   * @param email User email
-   * @returns User
-   */
-  async getUserByEmail(email: string): Promise<User> {
-    const result = await db.select().from(users).where(eq(users.email, email));
-
-    if (result.length === 0) {
+  async getUserByEmail(email: string): Promise<IUser> {
+    const user = await UserModel.findOne({ email: email.toLowerCase() });
+    if (!user) {
       throw new NotFoundError("User not found");
     }
-
-    return result[0];
+    return user;
   }
 
-  /**
-   * Get all users
-   * @returns Array of users
-   */
-  async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users);
+  async getAllUsers(): Promise<IUser[]> {
+    return await UserModel.find();
   }
 
-  /**
-   * Update a user
-   * @param id User ID
-   * @param userData User data to update
-   * @returns Updated user
-   */
-  async updateUser(id: number, userData: NewUser): Promise<User> {
-    // Ignore the roles because its a critical security flow, will fix it later
-    // if the userData.role is defined, replace it with 1000 (Learner role)
-    if (userData.role) {
-      userData.role = "1000"; // Default to Learner role
-    }
+  async updateUser(id: string, userData: Partial<NewUser>): Promise<IUser> {
+    const updateData: Partial<IUser> = {};
+    if (userData.pseudo !== undefined) updateData.pseudo = userData.pseudo;
+    if (userData.email !== undefined) updateData.email = userData.email.toLowerCase();
+    if (userData.role !== undefined) updateData.role = userData.role || "1000";
 
-    // Hash password if provided
-    let userToUpdate: any = { ...userData };
+
     if (userData.password) {
-      userToUpdate.password_hash = await hashPassword(userData.password);
-      delete userToUpdate.password;
+      updateData.password_hash = await hashPassword(userData.password);
     }
 
-    // Update user
-    const result = await db
-      .update(users)
-      .set(userToUpdate)
-      .where(eq(users.id, id))
-      .returning();
-
-    if (result.length === 0) {
+    const updatedUser = await UserModel.findByIdAndUpdate(id, { $set: updateData }, { new: true });
+    if (!updatedUser) {
       throw new NotFoundError("User not found");
     }
-
-    return result[0];
+    return updatedUser;
   }
 
-  /**
-   * Delete a user
-   * @param id User ID
-   * @returns True if user was deleted
-   */
-  async deleteUser(id: number): Promise<boolean> {
-    const result = await db
-      .delete(users)
-      .where(eq(users.id, id))
-      .returning({ id: users.id });
-
-    return result.length > 0;
+  async deleteUser(id: string): Promise<boolean> {
+    const result = await UserModel.findByIdAndDelete(id);
+    return !!result;
   }
 
-  /**
-   * Check if email is used
-   * @param email Email to check
-   * @returns True if email is in use
-   */
   async isEmailUsed(email: string): Promise<boolean> {
-    const result = await db.select().from(users).where(eq(users.email, email));
-
-    return result.length > 0;
+    const user = await UserModel.findOne({ email: email.toLowerCase() });
+    return !!user;
   }
 
-  /**
-   * Authenticate a user
-   * @param email User email
-   * @param password User password
-   * @returns User if authentication is successful
-   */
-  async authenticate(email: string, password: string): Promise<User> {
-    // Find user by email
+  async authenticate(email: string, password: string): Promise<IUser> {
     const user = await this.getUserByEmail(email);
-
-    // Verify password
     if (!user.password_hash) {
       throw new ApiError("Invalid credentials", 401);
     }
-
     const isValid = await verifyPassword(password, user.password_hash);
     if (!isValid) {
       throw new ApiError("Invalid credentials", 401);
     }
-
     return user;
   }
 
-  /**
-   * Store a refresh token
-   * @param userId User ID
-   * @param token Refresh token
-   * @param expiresAt Expiration date
-   */
-  async storeRefreshToken(
-    userId: string,
-    token: string,
-    expiresAt: string
-  ): Promise<void> {
-    await db.insert(refreshTokens).values({
+  async storeRefreshToken(id: string, token: string, expiresAt: string | Date): Promise<void> {
+    await RefreshTokenModel.create({
       token,
-      user_id: userId,
-      expires_at: expiresAt,
+      user_id: id,
+      expires_at: new Date(expiresAt),
     });
   }
 
-  /**
-   * Validate a refresh token
-   * @param token Refresh token
-   * @returns User ID if token is valid
-   */
   async validateRefreshToken(token: string): Promise<string> {
-    const result = await db
-      .select()
-      .from(refreshTokens)
-      .where(eq(refreshTokens.token, token));
-
-    if (result.length === 0) {
+    const refreshTokenDoc = await RefreshTokenModel.findOne({ token });
+    if (!refreshTokenDoc) {
       throw new ApiError("Invalid refresh token", 401);
     }
-
-    const refreshToken = result[0];
-
-    // Check if token has expired
-    if (new Date(refreshToken.expires_at) < new Date()) {
-      await db.delete(refreshTokens).where(eq(refreshTokens.token, token));
-
+    if (new Date(refreshTokenDoc.expires_at) < new Date()) {
+      await RefreshTokenModel.deleteOne({ token });
       throw new ApiError("Refresh token expired", 401);
     }
-
-    return refreshToken.user_id;
+    return refreshTokenDoc.user_id;
   }
 
-  /**
-   * Delete all refresh tokens for a user
-   * @param userId User ID
-   */
-  async deleteRefreshTokens(userId: string): Promise<void> {
-    await db.delete(refreshTokens).where(eq(refreshTokens.user_id, userId));
+  async deleteRefreshTokens(id: string): Promise<void> {
+    await RefreshTokenModel.deleteMany({ user_id: id });
   }
 }
 
-// Export a singleton instance
 export const userService = new UserService();

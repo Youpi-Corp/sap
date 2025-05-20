@@ -123,13 +123,13 @@ The API is documented with Swagger and accessible at:
 ### User Management
 
 - `GET /user/me`: Current user profile
-- `GET /user/get/:userId`: Retrieve a user by ID
+- `GET /user/get/:id`: Retrieve a user by ID
 - `GET /user/get_by_email/:email`: Retrieve a user by email
 - `GET /user/get_email_used/:email`: Check if an email is already in use
 - `POST /user/create`: Create a user (Admin only)
 - `GET /user/list`: List all users (Admin only)
-- `PUT /user/update/:userId`: Update a user
-- `DELETE /user/delete/:userId`: Delete a user (Admin only)
+- `PUT /user/update/:id`: Update a user
+- `DELETE /user/delete/:id`: Delete a user (Admin only)
 
 ### Platform Information
 

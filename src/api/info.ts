@@ -17,7 +17,7 @@ export function setupInfoRoutes() {
         "/get",
         async ({ set }) => {
           try {
-            const info = await infoService.getInfo();
+            const info = await infoService.getFirstInfo();
             return success(info);
           } catch (error) {
             // If info not found, set correct status code
