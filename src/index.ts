@@ -47,6 +47,7 @@ const app = new Elysia()
         "X-Requested-With",
         "Accept",
       ],
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       maxAge: 3600,
     })
   )
