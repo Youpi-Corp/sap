@@ -54,6 +54,7 @@ export class CourseService {
    * @returns Created course
    */
   async createCourse(courseData: NewCourse): Promise<Course> {
+    console.log("Creating course with data:", courseData);
     const result = await db.insert(courses).values(courseData).returning();
     return result[0];
   }

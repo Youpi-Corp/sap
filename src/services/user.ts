@@ -139,6 +139,8 @@ export class UserService {
       .where(eq(users.id, id))
       .returning();
 
+    console.log(result);
+
     if (result.length === 0) {
       throw new NotFoundError("User not found");
     }
