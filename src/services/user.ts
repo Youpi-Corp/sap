@@ -57,10 +57,10 @@ export class UserService {
     }
 
     // Hash password if provided
-    let userToInsert: any = { ...userData };
+    const userToInsert: Partial<User & { password_hash?: string | null }> = { ...userData };
     if (userData.password) {
       userToInsert.password_hash = await hashPassword(userData.password);
-      delete userToInsert.password;
+      delete (userToInsert as NewUser).password;
     }
 
     // Set default role if not provided
@@ -126,10 +126,10 @@ export class UserService {
     }
 
     // Hash password if provided
-    let userToUpdate: any = { ...userData };
+    const userToUpdate: Partial<User & { password_hash?: string | null }> = { ...userData };
     if (userData.password) {
       userToUpdate.password_hash = await hashPassword(userData.password);
-      delete userToUpdate.password;
+      delete (userToUpdate as NewUser).password;
     }
 
     // Update user

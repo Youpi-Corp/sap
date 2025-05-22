@@ -19,6 +19,17 @@ export enum Role {
 }
 
 /**
+ * Auth context additions interface
+ */
+export interface AuthContextAdditions {
+  user: JwtClaims | null;
+  isAuthenticated: () => boolean;
+  hasRoles: (roles: Role[]) => boolean;
+  guard: () => null;
+  guardRoles: (roles: Role[]) => null;
+}
+
+/**
  * Check if user has required roles
  * @param userRole User role string (e.g., "1000")
  * @param requiredRoles Array of required roles
@@ -56,13 +67,14 @@ export function setupAuth() {
         })
       )
       // Set up cookie plugin
-      .use(cookie())
-      // Add auth guard
-      .derive(async ({ jwt, cookie, headers }) => {
+      .use(cookie())      // Add auth guard
+      .derive(async (context: Record<string, unknown>) => {
         try {
           // Get token from cookie or Authorization header
-          const tokenFromCookie = cookie.auth_token;
+          const cookie = context.cookie as Record<string, { value?: string }>;
+          const tokenFromCookie = cookie.auth_token?.value;
 
+          const headers = context.headers as Record<string, string | undefined>;
           const authHeader = headers.authorization;
           const tokenFromHeader =
             authHeader && authHeader.startsWith("Bearer ")
@@ -76,6 +88,7 @@ export function setupAuth() {
           }
 
           // Verify token
+          const jwt = context.jwt as { verify: (token: string) => Promise<JwtClaims | boolean> };
           const verifyResult = await jwt.verify(token);
 
           // Handle boolean result (verification failure)
@@ -103,30 +116,30 @@ export function setupAuth() {
           console.error("Auth error:", error);
           return { user: null };
         }
-      })
-      // Add auth check functions
-      .derive((ctx) => {
+      })      // Add auth check functions
+      .derive((context: Record<string, unknown>) => {
         return {
           // Check if user is authenticated
           isAuthenticated: () => {
-            return !!ctx.user && !!ctx.user.sub;
+            const user = context.user as JwtClaims | null;
+            return !!user && !!user.sub;
           },
 
           // Check if user has any of the required roles
           hasRoles: (roles: Role[]) => {
-            const user = ctx.user;
+            const user = context.user as JwtClaims | null;
             if (!user || !user.role) return false;
             return hasRequiredRoles(user.role, roles);
           },
         };
-      })
-      // Guard middleware creator for routes
-      .derive((ctx) => {
+      })      // Guard middleware creator for routes
+      .derive((context: Record<string, unknown>) => {
         return {
           // Middleware to require authentication
           guard: () => {
-            if (!ctx.isAuthenticated()) {
-              // Return the error response but don't set the status here
+            const isAuthenticated = context.isAuthenticated as () => boolean;
+            if (!isAuthenticated()) {
+              // Return the error response but don\'t set the status here
               // The route handler will use this response and set the status code
               return UNAUTHORIZED;
             }
@@ -135,11 +148,13 @@ export function setupAuth() {
 
           // Middleware to require specific roles
           guardRoles: (roles: Role[]) => {
-            if (!ctx.isAuthenticated()) {
+            const isAuthenticated = context.isAuthenticated as () => boolean;
+            if (!isAuthenticated()) {
               return UNAUTHORIZED;
             }
 
-            if (!ctx.hasRoles(roles)) {
+            const hasRoles = context.hasRoles as (roles: Role[]) => boolean;
+            if (!hasRoles(roles)) {
               return FORBIDDEN;
             }
 

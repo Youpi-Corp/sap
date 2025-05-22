@@ -1,18 +1,18 @@
 import { db } from "../db/client";
 import { courses } from "../db/schema";
 import { eq } from "drizzle-orm";
-import { NotFoundError, ApiError } from "../middleware/error";
+import { NotFoundError } from "../middleware/error";
 
 // Course types
 export interface Course {
   id: number;
-  name: string;
-  content: string;
-  module_id: number;
-  level: number;
-  likes: number;
-  views: number;
-  public: boolean;
+  name: string | null;
+  content: string | null;
+  module_id: number | null;
+  level: number | null;
+  likes: number | null;
+  views: number | null;
+  public: boolean | null;
   chat_id: number | null;
 }
 

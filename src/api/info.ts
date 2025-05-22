@@ -1,7 +1,7 @@
 import { Elysia, t } from "elysia";
 import { infoService } from "../services/info";
 import { setupAuth, Role } from "../middleware/auth";
-import { success } from "../utils/response";
+import { success, UNAUTHORIZED, FORBIDDEN } from "../utils/response";
 
 /**
  * Setup info routes
@@ -19,9 +19,10 @@ export function setupInfoRoutes() {
           try {
             const info = await infoService.getInfo();
             return success(info);
-          } catch (error) {
+          } catch (fetchError) {
             // If info not found, set correct status code
             set.status = 404;
+            console.error("Error fetching info:", fetchError);
             return success(null, 404);
           }
         },
@@ -60,12 +61,12 @@ export function setupInfoRoutes() {
             },
           },
         }
-      )
-      // Update info (admin only)
+      )      // Update info (admin only)
       .put(
         "/update",
-        async ({ body, guardRoles, set }) => {
+        async ({ body, store, set }) => {
           // Check if user has admin role
+          const guardRoles = (store as Record<string, unknown>).guardRoles as (roles: Role[]) => typeof UNAUTHORIZED | typeof FORBIDDEN | null;
           const authResult = guardRoles([Role.Admin]);
           if (authResult) {
             // If guard returned a response, it means auth failed

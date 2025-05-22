@@ -1,7 +1,7 @@
 import { db } from "../db/client";
 import { modules } from "../db/schema";
 import { eq } from "drizzle-orm";
-import { NotFoundError, ApiError } from "../middleware/error";
+import { NotFoundError } from "../middleware/error";
 
 // Module types
 export interface Module {

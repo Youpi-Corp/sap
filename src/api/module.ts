@@ -1,8 +1,7 @@
 import { Elysia, t } from "elysia";
 import { moduleService } from "../services/module";
 import { setupAuth, Role } from "../middleware/auth";
-import { success, UNAUTHORIZED } from "../utils/response";
-import { ForbiddenError } from "../middleware/error";
+import { success } from "../utils/response";
 
 /**
  * Setup module routes

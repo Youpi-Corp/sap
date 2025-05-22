@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { error, INTERNAL_ERROR } from "../utils/response";
+import { error } from "../utils/response";
 
 // Custom error class for API errors
 export class ApiError extends Error {
@@ -70,7 +70,7 @@ export function setupErrorHandler() {
           // In production, don't expose error details
           const message = isProduction
             ? "Internal server error"
-            : err.message || "Unknown error";
+            : (err as Error).message || "Unknown error";
 
           console.error(`Unhandled Error [${code}]:`, err);
           return error(message, 500);

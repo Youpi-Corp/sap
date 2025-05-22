@@ -1,9 +1,27 @@
-import { Elysia, t } from "elysia";
+import { Elysia, t, type Context } from "elysia"; // Added 'type Context'
 import { userService, LoginRequest } from "../services/user";
 import { setupAuth } from "../middleware/auth";
 import { success, error } from "../utils/response";
 import crypto from "crypto";
-import { cookie } from "@elysiajs/cookie";
+import { cookie as cookiePlugin } from "@elysiajs/cookie"; // Renamed import
+
+// Define types for properties expected on the context but not recognized by TS
+type ElysiaJwtSigner = {
+  sign: (payload: { sub: string | undefined; role: string | number }) => Promise<string>;
+};
+
+type ContextUser = {
+  sub: string;
+  email?: string;
+  role?: string | number;
+};
+
+// Extend Elysia's base Context with jwt and user
+interface HandlerContext extends Context {
+  jwt: ElysiaJwtSigner;
+  user?: ContextUser;
+  // The 'cookie' store (Record<string, CookieType>) is expected to be on Context via @elysiajs/cookie
+}
 
 /**
  * Setup auth routes
@@ -13,10 +31,10 @@ export function setupAuthRoutes() {
 
   return new Elysia({ prefix: "/auth" })
     .use(authPlugin)
-    .use(cookie()) // Add cookie plugin explicitly
+    .use(cookiePlugin()) // Use the renamed import
     .post(
       "/login",
-      async ({ body, jwt, setCookie, set }) => {
+      async ({ body, jwt, cookie, set }: HandlerContext) => { // Use HandlerContext, destructure cookie store
         try {
           // Validate request
           const { email, password } = body as LoginRequest;
@@ -43,19 +61,19 @@ export function setupAuthRoutes() {
           );
 
           // Generate JWT - handle null values to match expected types
-          const accessToken = await jwt.sign({
+          const accessToken = await jwt.sign({ // jwt from HandlerContext
             sub: user.email, // sub must be string | undefined
             role: user.role || "1000", // role must be string | number
           });
 
-          // Set cookie with the JWT using the setCookie function
-          setCookie("auth_token", accessToken, {
+          // Set cookie with the JWT using the cookie store from context
+          cookie.auth_token.set({ // Use cookie store's .set() method
+            value: accessToken,
             httpOnly: true,
             path: "/",
             maxAge: 900, // 15 minutes
             sameSite: "none", // Allow cross-domain use
-            // Secure should be true in production but false in development to work on http localhost
-            secure: true,
+            secure: process.env.NODE_ENV === 'production', // Conditional secure flag
           });
 
           console.log(
@@ -71,10 +89,10 @@ export function setupAuthRoutes() {
             refreshToken,
             expiresIn: 900, // 15 minutes
           });
-        } catch (err: any) {
+        } catch (err: unknown) {
           // Set correct status code for authentication failures
           set.status = 401;
-          return error(err.message || "Invalid credentials", 401);
+          return error((err as Error).message || "Invalid credentials", 401);
         }
       },
       {
@@ -107,18 +125,18 @@ export function setupAuthRoutes() {
 
           set.status = 201;
           return success(user, 201);
-        } catch (err: any) {
+        } catch (err: unknown) {
 
           console.error("Error creating user:", err);
 
           // Set appropriate status code based on error
-          if (err.message && err.message.includes("already in use")) {
+          if ((err as Error).message && (err as Error).message.includes("already in use")) {
             set.status = 409;
-            return error(err.message, 409);
+            return error((err as Error).message, 409);
           }
 
           set.status = 400;
-          return error(err.message || "Failed to create user", 400);
+          return error((err as Error).message || "Failed to create user", 400);
         }
       },
       {
@@ -148,15 +166,15 @@ export function setupAuthRoutes() {
     )
     .post(
       "/refresh",
-      async ({ body, jwt, setCookie, set }) => {
+      async ({ body, jwt, cookie, set }: HandlerContext) => { // Use HandlerContext, destructure cookie store
         try {
           const { refreshToken } = body as { refreshToken: string };
 
           // Validate refresh token
           const userId = await userService.validateRefreshToken(refreshToken);
 
-          // Get user
-          const user = await userService.getUserByEmail(userId);
+          // Get user (renamed to avoid conflict with context.user if destructured)
+          const userFromDb = await userService.getUserByEmail(userId);
 
           // Generate new refresh token
           const newRefreshToken = crypto.randomBytes(32).toString("hex");
@@ -165,30 +183,31 @@ export function setupAuthRoutes() {
           ).toISOString(); // 7 days
 
           // Make sure email exists before using it
-          if (!user.email) {
+          if (!userFromDb.email) {
             throw new Error("User email is missing");
           }
 
           // Store new refresh token
           await userService.storeRefreshToken(
-            user.email,
+            userFromDb.email,
             newRefreshToken,
             expiresAt
           );
 
           // Generate new JWT - handle null values to match expected types
-          const accessToken = await jwt.sign({
-            sub: user.email, // sub must be string | undefined
-            role: user.role || "1000", // role must be string | number
+          const accessToken = await jwt.sign({ // jwt from HandlerContext
+            sub: userFromDb.email, // sub must be string | undefined
+            role: userFromDb.role || "1000", // role must be string | number
           });
 
-          // Set cookie with the new JWT
-          setCookie("auth_token", accessToken, {
+          // Set cookie with the new JWT using the cookie store
+          cookie.auth_token.set({ // Use cookie store's .set() method
+            value: accessToken,
             httpOnly: true,
             path: "/",
             maxAge: 900, // 15 minutes
             sameSite: "none", // Allow cross-domain use
-            secure: true,
+            secure: process.env.NODE_ENV === 'production', // Conditional secure flag
           });
 
           // Return success response
@@ -197,10 +216,10 @@ export function setupAuthRoutes() {
             refreshToken: newRefreshToken,
             expiresIn: 900, // 15 minutes
           });
-        } catch (err: any) {
+        } catch (err: unknown) {
           // Set correct status code for token errors
           set.status = 401;
-          return error(err.message || "Invalid refresh token", 401);
+          return error((err as Error).message || "Invalid refresh token", 401);
         }
       },
       {
@@ -224,20 +243,21 @@ export function setupAuthRoutes() {
     )
     .post(
       "/logout",
-      async ({ user, setCookie }) => {
-        // Only process if user is authenticated
-        if (user) {
+      async ({ user, cookie }: HandlerContext) => { // Use HandlerContext, destructure cookie store and user
+        // Only process if user is authenticated (user from HandlerContext)
+        if (user && user.sub) { // user.sub should contain the identifier (e.g., email)
           // Delete refresh tokens
           await userService.deleteRefreshTokens(user.sub);
         }
 
-        // Clear the auth cookie
-        setCookie("auth_token", "", {
+        // Clear the auth cookie using the cookie store
+        cookie.auth_token.set({ // Use cookie store's .set() method
+          value: "",
           httpOnly: true,
           path: "/",
           maxAge: 0, // Expire immediately
           sameSite: "none", // Allow cross-domain use
-          secure: true,
+          secure: process.env.NODE_ENV === 'production', // Conditional secure flag
         });
 
         return success({ message: "Logged out successfully" });
