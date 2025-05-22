@@ -1,4 +1,4 @@
-import { Elysia, t } from "elysia";
+import { t } from "elysia";
 import { courseService } from "../services/course";
 import { setupAuth, Role } from "../middleware/auth";
 import { success } from "../utils/response";
@@ -7,11 +7,8 @@ import { success } from "../utils/response";
  * Setup course routes
  */
 export function setupCourseRoutes() {
-  const authPlugin = setupAuth();
-
-  return (
-    new Elysia({ prefix: "/course" })
-      .use(authPlugin)
+  return setupAuth().group("/course", (app) =>
+    app
       // Get all courses
       .get(
         "/list",

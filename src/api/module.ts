@@ -9,13 +9,16 @@ import { success } from "../utils/response";
 export function setupModuleRoutes() {
   const authPlugin = setupAuth();
 
+  type GuardRolesFn = (allowedRoles: Role[]) => { statusCode: number;[x: string]: unknown; } | undefined | null;
+  type SetContext = { status: number | string; headers?: Record<string, string>; };
+
   return (
     new Elysia({ prefix: "/module" })
       .use(authPlugin)
       // Get all modules
       .get(
         "/list",
-        async ({ guardRoles, set }) => {
+        async ({ guardRoles, set }: { guardRoles: GuardRolesFn, set: SetContext }) => {
           const authResult = guardRoles([Role.Learner, Role.Teacher, Role.Admin]);
           if (authResult) {
             set.status = authResult.statusCode;
@@ -48,7 +51,7 @@ export function setupModuleRoutes() {
       // Get module by ID
       .get(
         "/get/:moduleId",
-        async ({ params, guardRoles, set }) => {
+        async ({ params, guardRoles, set }: { params: { moduleId: string }, guardRoles: GuardRolesFn, set: SetContext }) => {
           const authResult = guardRoles([Role.Learner, Role.Teacher, Role.Admin]);
           if (authResult) {
             set.status = authResult.statusCode;
@@ -82,7 +85,7 @@ export function setupModuleRoutes() {
       // Create a new module (Admin or Teacher only)
       .post(
         "/create",
-        async ({ body, guardRoles, set }) => {
+        async ({ body, guardRoles, set }: { body: { name: string; content: string; user_id: number; }, guardRoles: GuardRolesFn, set: SetContext }) => {
           const authResult = guardRoles([Role.Teacher, Role.Admin]);
           if (authResult) {
             set.status = authResult.statusCode;
@@ -121,7 +124,7 @@ export function setupModuleRoutes() {
       // Update a module (Admin or Teacher only)
       .put(
         "/update/:moduleId",
-        async ({ params, body, guardRoles, set }) => {
+        async ({ params, body, guardRoles, set }: { params: { moduleId: string }, body: { name?: string; content?: string; user_id?: number; }, guardRoles: GuardRolesFn, set: SetContext }) => {
           const authResult = guardRoles([Role.Teacher, Role.Admin]);
           if (authResult) {
             set.status = authResult.statusCode;
@@ -163,7 +166,7 @@ export function setupModuleRoutes() {
       // Delete a module (Admin only)
       .delete(
         "/delete/:moduleId",
-        async ({ params, guardRoles, set }) => {
+        async ({ params, guardRoles, set }: { params: { moduleId: string }, guardRoles: GuardRolesFn, set: SetContext }) => {
           const authResult = guardRoles([Role.Admin]);
           if (authResult) {
             set.status = authResult.statusCode;
@@ -175,6 +178,9 @@ export function setupModuleRoutes() {
           return success({ message: "Module deleted" });
         },
         {
+          params: t.Object({
+            moduleId: t.String(),
+          }),
           detail: {
             tags: ["Modules"],
             summary: "Delete a module",

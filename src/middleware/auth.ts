@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
-import { jwt } from "@elysiajs/jwt";
-import { cookie } from "@elysiajs/cookie";
-import { UNAUTHORIZED, FORBIDDEN } from "../utils/response";
+import { jwt as jwtPlugin } from "@elysiajs/jwt";
+import { cookie as cookiePlugin } from "@elysiajs/cookie";
+import { UNAUTHORIZED, FORBIDDEN, type ApiResponse } from "../utils/response";
 
 // JWT claims interface
 export interface JwtClaims {
@@ -19,17 +19,6 @@ export enum Role {
 }
 
 /**
- * Auth context additions interface
- */
-export interface AuthContextAdditions {
-  user: JwtClaims | null;
-  isAuthenticated: () => boolean;
-  hasRoles: (roles: Role[]) => boolean;
-  guard: () => null;
-  guardRoles: (roles: Role[]) => null;
-}
-
-/**
  * Check if user has required roles
  * @param userRole User role string (e.g., "1000")
  * @param requiredRoles Array of required roles
@@ -41,8 +30,8 @@ function hasRequiredRoles(userRole: string, requiredRoles: Role[]): boolean {
     return false;
   }
 
-  // Admin check (position 3)
-  if (userRole.charAt(3) === "1") {
+  // Admin check (position Role.Admin which is 3)
+  if (userRole.charAt(Role.Admin) === "1") {
     return true;
   }
 
@@ -57,108 +46,75 @@ export function setupAuth() {
   const jwtSecret = process.env.JWT_SECRET || "default-secret-change-me";
 
   return (
-    new Elysia({ name: "auth" })
-      // Set up JWT plugin
+    new Elysia({ name: "auth" }) // Using name for robust type handling, removed seed: {}
       .use(
-        jwt({
-          name: "jwt",
+        jwtPlugin({
+          name: "jwt", // This is crucial for context.jwt typing
           secret: jwtSecret,
-          exp: "15m", // 15 minutes
+          exp: "15m",
         })
       )
-      // Set up cookie plugin
-      .use(cookie())      // Add auth guard
-      .derive(async (context: Record<string, unknown>) => {
+      .use(cookiePlugin())
+      .derive(async ({ jwt, cookie, headers }) => {
+        // Elysia should infer jwt and cookie from the plugins above
+        // If 'jwt' is not found on the destructured context, type inference is failing.
         try {
-          // Get token from cookie or Authorization header
-          const cookie = context.cookie as Record<string, { value?: string }>;
           const tokenFromCookie = cookie.auth_token?.value;
-
-          const headers = context.headers as Record<string, string | undefined>;
           const authHeader = headers.authorization;
           const tokenFromHeader =
             authHeader && authHeader.startsWith("Bearer ")
               ? authHeader.substring(7)
               : null;
-
           const token = tokenFromCookie || tokenFromHeader;
 
           if (!token) {
             return { user: null };
           }
 
-          // Verify token
-          const jwt = context.jwt as { verify: (token: string) => Promise<JwtClaims | boolean> };
+          // verify can return false if verification fails, or the payload (JwtClaims)
           const verifyResult = await jwt.verify(token);
 
-          // Handle boolean result (verification failure)
-          if (!verifyResult || typeof verifyResult === "boolean") {
-            console.log("Token verification failed");
+          if (!verifyResult) {
+            // This handles cases where verifyResult is false or null
+            console.log("Token verification failed (jwt.verify returned falsy)");
             return { user: null };
           }
 
-          // Safe type casting after validation
+          // At this point, verifyResult should be JwtClaims if not falsy
           const user = verifyResult as unknown as JwtClaims;
-
-          if (!user) {
-            console.log("Token verification failed");
-            return { user: null };
-          }
 
           if (!user.sub) {
             console.log("Token missing subject (email)");
             return { user: null };
           }
-
-          // Token is valid
           return { user };
         } catch (error) {
-          console.error("Auth error:", error);
+          // Catch errors from jwt.verify (e.g., malformed token, signature mismatch)
+          console.error("Auth error during token verification:", error);
           return { user: null };
         }
-      })      // Add auth check functions
-      .derive((context: Record<string, unknown>) => {
-        return {
-          // Check if user is authenticated
-          isAuthenticated: () => {
-            const user = context.user as JwtClaims | null;
-            return !!user && !!user.sub;
-          },
+      })
+      .derive(({ user }) => {
+        // user is inferred from the previous derive: JwtClaims | null
+        const isAuthenticatedUser = !!user && !!user.sub;
+        const currentUserRole = user?.role;
 
-          // Check if user has any of the required roles
-          hasRoles: (roles: Role[]) => {
-            const user = context.user as JwtClaims | null;
-            if (!user || !user.role) return false;
-            return hasRequiredRoles(user.role, roles);
-          },
+        const checkHasRoles = (requiredRoles: Role[]): boolean => {
+          if (!isAuthenticatedUser || !currentUserRole) return false;
+          return hasRequiredRoles(currentUserRole, requiredRoles);
         };
-      })      // Guard middleware creator for routes
-      .derive((context: Record<string, unknown>) => {
+
         return {
-          // Middleware to require authentication
-          guard: () => {
-            const isAuthenticated = context.isAuthenticated as () => boolean;
-            if (!isAuthenticated()) {
-              // Return the error response but don\'t set the status here
-              // The route handler will use this response and set the status code
-              return UNAUTHORIZED;
+          isAuthenticated: (): boolean => isAuthenticatedUser,
+          hasRoles: checkHasRoles,
+          guardRoles: (requiredRoles: Role[]): ApiResponse<null> | undefined => {
+            if (!isAuthenticatedUser) {
+              return UNAUTHORIZED; // Assumes UNAUTHORIZED is an ApiResponse object
             }
-            return null; // No error
-          },
-
-          // Middleware to require specific roles
-          guardRoles: (roles: Role[]) => {
-            const isAuthenticated = context.isAuthenticated as () => boolean;
-            if (!isAuthenticated()) {
-              return UNAUTHORIZED;
+            if (!checkHasRoles(requiredRoles)) {
+              return FORBIDDEN; // Assumes FORBIDDEN is an ApiResponse object
             }
-
-            const hasRoles = context.hasRoles as (roles: Role[]) => boolean;
-            if (!hasRoles(roles)) {
-              return FORBIDDEN;
-            }
-
-            return null; // No error
+            return undefined; // Authorized
           },
         };
       })
