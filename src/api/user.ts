@@ -54,12 +54,13 @@ export function setupUserRoutes() {
       )      // Get user by ID
       .get(
         "/get/:userId",
-        async ({ params, requireAuth }) => {          // Require authentication          await requireAuth(); const userId = parseInt(params.userId, 10);
-          const user = await userService.getUserById(userId);
+        async ({ params, requireAuth }) => {          // Require authentication
+          await requireAuth();
+          const user = await userService.getUserById(parseInt(params.userId));
 
           // Get user's roles
           const { roleService } = await import("../services/role");
-          const userRoles = await roleService.getUserRoleNames(userId);
+          const userRoles = await roleService.getUserRoleNames(parseInt(params.userId));
 
           // Remove sensitive data
           const { password_hash, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars

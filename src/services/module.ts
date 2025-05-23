@@ -1,6 +1,6 @@
 import { db } from "../db/client";
 import { modules, moduleSubscriptions, courseModules, courses } from "../db/schema";
-import { eq, and, count, sql } from "drizzle-orm";
+import { eq, and, count } from "drizzle-orm";
 import { NotFoundError } from "../middleware/error";
 import type { Course } from "./course"; // Import Course type as a type only
 

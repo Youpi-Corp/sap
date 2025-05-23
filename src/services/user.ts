@@ -47,18 +47,20 @@ export class UserService {  /**
       if (existingUser.length > 0) {
         throw new ApiError("Email already in use", 409);
       }
-    }
-
-    // Hash password if provided
+    }    // Hash password if provided
     const userToInsert: Partial<User & { password_hash?: string | null }> = { ...userData };
     if (userData.password) {
       userToInsert.password_hash = await hashPassword(userData.password);
-      delete (userToInsert as any).password;
+      // Create a typed record before deleting a property
+      const userRecord = userToInsert as Partial<User & { password_hash?: string | null } & { password?: string }>;
+      delete userRecord.password;
     }
 
     // Remove roles from insert data (will be handled separately)
     const userRoles = userData.roles || [];
-    delete (userToInsert as any).roles;
+    // Create a typed record before deleting a property
+    const userRecordWithRoles = userToInsert as Partial<User & { password_hash?: string | null } & { roles?: string[] }>;
+    delete userRecordWithRoles.roles;
 
     // Insert user
     const result = await db.insert(users).values(userToInsert).returning();
@@ -146,17 +148,20 @@ export class UserService {  /**
    */  async updateUser(
     id: number,
     userData: NewUser,
-    isAdmin: boolean = false,
-  ): Promise<User> {
+    isAdmin: boolean = false,): Promise<User> {
     // Extract roles to update separately if provided
     const rolesToUpdate = userData.roles || [];
-    delete (userData as any).roles;
+    // Create a typed record before deleting a property
+    const userDataWithRoles = userData as NewUser & { roles?: string[] };
+    delete userDataWithRoles.roles;
 
     // Hash password if provided
     const userToUpdate: Partial<User & { password_hash?: string | null }> = { ...userData };
     if (userData.password) {
       userToUpdate.password_hash = await hashPassword(userData.password);
-      delete (userToUpdate as any).password;
+      // Create a typed record before deleting a property
+      const userRecord = userToUpdate as Partial<User & { password_hash?: string | null } & { password?: string }>;
+      delete userRecord.password;
     }
 
     // Update user
