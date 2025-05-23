@@ -23,10 +23,14 @@ export function setupUserRoutes() {
             const userId = parseInt(claims.sub);            // Get user data
             const user = await userService.getUserById(userId);
 
+            // Get user's roles
+            const { roleService } = await import("../services/role");
+            const userRoles = await roleService.getUserRoleNames(userId);
+
             // Remove sensitive data
             const { password_hash, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars
 
-            return success(userData);
+            return success({ ...userData, roles: userRoles });
           } catch (err) {
             set.status = 401;
             return error((err as Error).message || "Authentication required", 401);
@@ -50,14 +54,17 @@ export function setupUserRoutes() {
       )      // Get user by ID
       .get(
         "/get/:userId",
-        async ({ params, requireAuth }) => {          // Require authentication
-          await requireAuth(); const userId = parseInt(params.userId, 10);
+        async ({ params, requireAuth }) => {          // Require authentication          await requireAuth(); const userId = parseInt(params.userId, 10);
           const user = await userService.getUserById(userId);
+
+          // Get user's roles
+          const { roleService } = await import("../services/role");
+          const userRoles = await roleService.getUserRoleNames(userId);
 
           // Remove sensitive data
           const { password_hash, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars
 
-          return success(userData);
+          return success({ ...userData, roles: userRoles });
         },
         {
           detail: {
@@ -82,12 +89,17 @@ export function setupUserRoutes() {
       .get(
         "/get_by_email/:email",
         async ({ params, requireAuth }) => {          // Require authentication
-          await requireAuth(); const user = await userService.getUserByEmail(params.email);
+          await requireAuth();
+          const user = await userService.getUserByEmail(params.email);
+
+          // Get user's roles
+          const { roleService } = await import("../services/role");
+          const userRoles = await roleService.getUserRoleNames(user.id);
 
           // Remove sensitive data
           const { password_hash, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars
 
-          return success(userData);
+          return success({ ...userData, roles: userRoles });
         },
         {
           detail: {
@@ -157,7 +169,7 @@ export function setupUserRoutes() {
             pseudo: t.Optional(t.String()),
             email: t.String(),
             password: t.String(),
-            role: t.Optional(t.String()),
+            roles: t.Optional(t.Array(t.String())),
           }),
           detail: {
             tags: ["Users"],
@@ -182,15 +194,24 @@ export function setupUserRoutes() {
           if (authResult) {
             set.status = authResult.statusCode;
             return authResult;
-          }
-
-          // If we get here, the user is authenticated and has admin role
+          }          // If we get here, the user is authenticated and has admin role
           await requireAuth();
-          const users = await userService.getAllUsers();// Remove sensitive data
-          const safeUsers = users.map(user => {
-            const { password_hash, email, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars
-            return userData;
-          });
+          const users = await userService.getAllUsers();
+
+          // Get roles for each user and remove sensitive data
+          const { roleService } = await import("../services/role");
+          const safeUsers = await Promise.all(users.map(async user => {
+            const { password_hash, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars
+
+            // Get user's roles
+            try {
+              const roles = await roleService.getUserRoleNames(user.id);
+              return { ...userData, roles };
+            } catch (err) {
+              console.error(`Error fetching roles for user ${user.id}:`, err);
+              return { ...userData, roles: [] };
+            }
+          }));
 
           return success(safeUsers);
         },
@@ -273,7 +294,7 @@ export function setupUserRoutes() {
             pseudo: t.Optional(t.String()),
             email: t.Optional(t.String()),
             password: t.Optional(t.String()),
-            role: t.Optional(t.String()),
+            roles: t.Optional(t.Array(t.String())),
           }),
           detail: {
             tags: ["Users"],

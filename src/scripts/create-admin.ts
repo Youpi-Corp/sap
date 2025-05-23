@@ -21,15 +21,7 @@ async function createAdmin(email: string, password?: string) {
                 // Update existing user to admin
                 const user = existingUsers[0];
 
-                // Update legacy role field for backward compatibility
-                if (user.role !== ROLES.ADMIN) {
-                    await db
-                        .update(users)
-                        .set({ role: ROLES.ADMIN })
-                        .where(eq(users.id, user.id));
-                }
-
-                // Check if user already has the admin role in the new role system
+                // Check if user already has the admin role in the role system
                 const { roleService } = await import("../services/role");
                 const hasAdminRole = await roleService.userHasRole(user.id, ROLES.ADMIN);
 
@@ -51,7 +43,7 @@ async function createAdmin(email: string, password?: string) {
                     {
                         email,
                         password,
-                        role: ROLES.ADMIN,
+                        roles: [ROLES.ADMIN],
                         pseudo: 'System Administrator'
                     },
                     true // isAdmin=true to allow setting the admin role

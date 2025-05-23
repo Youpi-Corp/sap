@@ -11,14 +11,13 @@ export interface User {
   pseudo: string | null;
   email: string | null;
   password_hash: string | null;
-  role: string | null;
 }
 
 export interface NewUser {
   pseudo?: string | null;
   email?: string | null;
   password?: string | null;
-  role?: string | null;
+  roles?: string[]; // Array of role names instead of a single role
 }
 
 export interface LoginRequest {
@@ -37,8 +36,7 @@ export class UserService {  /**
    * @param userData User data
    * @param isAdmin Whether the creator is an admin (determines if role can be set)
    * @returns Created user
-   */
-  async createUser(userData: NewUser, isAdmin: boolean = false): Promise<User> {
+   */  async createUser(userData: NewUser, isAdmin: boolean = false): Promise<User> {
     // Check if email already exists
     if (userData.email) {
       const existingUser = await db
@@ -55,38 +53,42 @@ export class UserService {  /**
     const userToInsert: Partial<User & { password_hash?: string | null }> = { ...userData };
     if (userData.password) {
       userToInsert.password_hash = await hashPassword(userData.password);
-      delete (userToInsert as NewUser).password;
-    }    // Handle legacy role field
-    if (isAdmin && userData.role) {
-      // Only admins can set specific roles
-      if (!isValidRole(userData.role)) {
-        throw new ApiError("Invalid role specified", 400);
-      }
-      userToInsert.role = userData.role;
-    } else {
-      // Non-admins can only create regular users
-      userToInsert.role = getDefaultRole();
+      delete (userToInsert as any).password;
     }
+
+    // Remove roles from insert data (will be handled separately)
+    const userRoles = userData.roles || [];
+    delete (userToInsert as any).roles;
 
     // Insert user
     const result = await db.insert(users).values(userToInsert).returning();
 
-    // Assign default role to the new user in the user_roles table
+    // Assign roles to the new user in the user_roles table
     const { roleService } = await import("./role");
     try {
       // Get the default USER role
       const userRole = await roleService.getRoleByName(getDefaultRole());
       await roleService.assignRoleToUser(result[0].id, userRole.id);
 
-      // If the user should have additional roles (admin creating with specific role)
-      if (isAdmin && userData.role && userData.role !== getDefaultRole()) {
-        // Get that role and assign it too
-        try {
-          const additionalRole = await roleService.getRoleByName(userData.role);
-          await roleService.assignRoleToUser(result[0].id, additionalRole.id);
-        } catch (err) {
-          // Log but don't fail if the additional role cannot be assigned
-          console.error(`Could not assign role ${userData.role} to new user:`, err);
+      // If the user should have additional roles and the creator is an admin
+      if (isAdmin && userRoles.length > 0) {
+        for (const roleName of userRoles) {
+          // Skip if it's the default role (already assigned)
+          if (roleName === getDefaultRole()) continue;
+
+          // Validate the role
+          if (!isValidRole(roleName)) {
+            console.warn(`Invalid role specified: ${roleName}`);
+            continue;
+          }
+
+          try {
+            const role = await roleService.getRoleByName(roleName);
+            await roleService.assignRoleToUser(result[0].id, role.id);
+          } catch (err) {
+            // Log but don't fail if the additional role cannot be assigned
+            console.error(`Could not assign role ${roleName} to new user:`, err);
+          }
         }
       }
     } catch (err) {
@@ -141,29 +143,20 @@ export class UserService {  /**
    * @param isAdmin Whether the updater is an admin (determines if role can be changed)
    * @param currentUserId ID of the user performing the update
    * @returns Updated user
-   */
-  async updateUser(
+   */  async updateUser(
     id: number,
     userData: NewUser,
     isAdmin: boolean = false,
   ): Promise<User> {
-    // Security checks
-    // Only admins can change roles
-    if (userData.role && !isAdmin) {
-      // Remove role from update data for non-admins
-      delete userData.role;
-    } else if (userData.role && isAdmin) {
-      // Admins can only set valid roles
-      if (!isValidRole(userData.role)) {
-        throw new ApiError("Invalid role specified", 400);
-      }
-    }
+    // Extract roles to update separately if provided
+    const rolesToUpdate = userData.roles || [];
+    delete (userData as any).roles;
 
     // Hash password if provided
     const userToUpdate: Partial<User & { password_hash?: string | null }> = { ...userData };
     if (userData.password) {
       userToUpdate.password_hash = await hashPassword(userData.password);
-      delete (userToUpdate as NewUser).password;
+      delete (userToUpdate as any).password;
     }
 
     // Update user
@@ -175,6 +168,50 @@ export class UserService {  /**
 
     if (result.length === 0) {
       throw new NotFoundError("User not found");
+    }
+
+    // Update roles if admin and roles provided
+    if (isAdmin && rolesToUpdate.length > 0) {
+      const { roleService } = await import("./role");
+
+      try {
+        // Get current user roles
+        const currentRoles = await roleService.getUserRoles(id);
+        const currentRoleNames = currentRoles.map(r => r.name);
+
+        // Determine roles to add and roles to remove
+        const rolesToAdd = rolesToUpdate.filter(r => !currentRoleNames.includes(r));
+        const rolesToRemove = currentRoles.filter(r => !rolesToUpdate.includes(r.name) && r.name !== getDefaultRole());
+
+        // Add new roles
+        for (const roleName of rolesToAdd) {
+          if (!isValidRole(roleName)) {
+            console.warn(`Invalid role specified: ${roleName}, skipping assignment`);
+            continue;
+          }
+
+          try {
+            const role = await roleService.getRoleByName(roleName);
+            await roleService.assignRoleToUser(id, role.id);
+          } catch (err) {
+            console.error(`Could not assign role ${roleName} to user:`, err);
+          }
+        }
+
+        // Remove roles no longer needed
+        for (const role of rolesToRemove) {
+          // Never remove the default user role
+          if (role.name === getDefaultRole()) continue;
+
+          try {
+            await roleService.removeRoleFromUser(id, role.id);
+          } catch (err) {
+            console.error(`Could not remove role ${role.name} from user:`, err);
+          }
+        }
+      } catch (err) {
+        console.error("Error updating user roles:", err);
+      }
     }
 
     return result[0];
