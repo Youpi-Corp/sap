@@ -43,6 +43,13 @@
       "when": 1748020593168,
       "tag": "0005_certain_black_knight",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1748022165823,
+      "tag": "0006_abnormal_jubilee",
+      "breakpoints": true
     }
   ]
 }

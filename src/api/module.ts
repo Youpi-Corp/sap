@@ -3,6 +3,7 @@ import { moduleService } from "../services/module";
 import { success, error } from "../utils/response";
 import { setupAuth } from "../middleware/auth";
 import { ROLES } from "../utils/roles";
+import { NotFoundError } from "../middleware/error";
 
 /**
  * Setup module routes
@@ -39,35 +40,89 @@ export function setupModuleRoutes() {
           },
         }
       )
-      // Get module by ID
+      // Get public modules
       .get(
-        "/get/:moduleId",
-        async ({ params, requireAuth }) => {
-          // Require authentication
-          await requireAuth();
-
-          const moduleId = parseInt(params.moduleId, 10);
-          const module = await moduleService.getModuleById(moduleId);
-          return success(module);
+        "/public",
+        async () => {
+          // No authentication required for public modules
+          const modules = await moduleService.getPublicModules();
+          return success(modules);
         },
         {
           detail: {
             tags: ["Modules"],
-            summary: "Get module by ID",
-            description: "Retrieve a module by its ID",
+            summary: "List public modules",
+            description: "Retrieve a list of all public modules (no authentication required)",
             responses: {
               "200": {
-                description: "Module found",
-              },
-              "401": {
-                description: "Authentication required",
-              },
-              "404": {
-                description: "Module not found",
-              },
+                description: "List of public modules retrieved successfully",
+              }
             },
           },
         }
+      )      // Get module by ID
+      .get(
+        "/get/:moduleId",
+        async ({ params, requireAuth, set }) => {
+          try {
+            // Get user from JWT token if available
+            let userId: number | null = null;
+            let userRoles: string[] = [];
+
+            try {
+              const claims = await requireAuth();
+              userId = parseInt(claims.sub);
+              userRoles = claims.roles;
+            } catch (error) {
+              // Continue without auth - will only allow access to public modules
+            }
+
+            const moduleId = parseInt(params.moduleId, 10);
+            const module = await moduleService.getModuleById(moduleId);
+
+            // Check if the user can access this module
+            // Allow access if:
+            // 1. Module is public, OR
+            // 2. User is the module owner, OR
+            // 3. User has the ADMIN role
+            const isOwner = userId && module.owner_id === userId;
+            const isAdmin = userRoles.includes(ROLES.ADMIN);
+            const isPublic = module.public === true;
+
+            if (!isPublic && !isOwner && !isAdmin) {
+              set.status = 403;
+              return error("You are not authorized to access this module", 403);
+            }
+
+            return success(module);
+          } catch (err) {
+            if (err instanceof NotFoundError) {
+              set.status = 404;
+              return error("Module not found", 404);
+            }
+            throw err;
+          }
+        }, {
+        detail: {
+          tags: ["Modules"],
+          summary: "Get module by ID",
+          description: "Retrieve a module by its ID. If the module is private, only the owner or admin can access it. Public modules can be accessed by anyone.",
+          responses: {
+            "200": {
+              description: "Module found",
+            },
+            "401": {
+              description: "Authentication required",
+            },
+            "403": {
+              description: "Not authorized to access this module",
+            },
+            "404": {
+              description: "Module not found",
+            },
+          },
+        },
+      }
       )
       // Get modules by owner ID
       .get(
@@ -164,10 +219,11 @@ export function setupModuleRoutes() {
           set.status = 201;
           return success(module, 201);
         }, {
-        body: t.Object({
-          title: t.String(), // Changed from 'name'
-          description: t.Optional(t.String()), // Added description
-        }),
+          body: t.Object({
+            title: t.String(), // Changed from 'name'
+            description: t.Optional(t.String()), // Added description
+            public: t.Optional(t.Boolean()), // Added public flag with default value
+          }),
         detail: {
           tags: ["Modules"],
           summary: "Create a new module",
@@ -202,10 +258,11 @@ export function setupModuleRoutes() {
           const updatedModule = await moduleService.updateModule(moduleId, body);
           return success(updatedModule);
         }, {
-        body: t.Object({
-          title: t.Optional(t.String()), // Changed from 'name'
-          description: t.Optional(t.String()), // Added description
-        }),
+          body: t.Object({
+            title: t.Optional(t.String()), // Changed from 'name'
+            description: t.Optional(t.String()), // Added description
+            public: t.Optional(t.Boolean()), // Added public flag
+          }),
         detail: {
           tags: ["Modules"],
           summary: "Update a module",

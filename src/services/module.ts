@@ -11,6 +11,7 @@ export interface Module {
   description: string | null; // Added description
   owner_id: number | null;
   courses_count: number | null; // Added courses count
+  public: boolean; // Public flag - always boolean, never null
   dtc: string | null; // Date time created
   dtm: string | null; // Date time modified
   courses?: Course[]; // Optional courses array
@@ -19,11 +20,11 @@ export interface Module {
 export interface NewModule {
   title: string | null; // Renamed from 'name'
   description?: string | null; // Added description
+  public?: boolean; // Public flag - optional but always boolean when provided
   owner_id: number | null;
 }
 
-export class ModuleService {
-  /**
+export class ModuleService {  /**
    * Create a new module
    * @param moduleData Module data
    * @returns Created module
@@ -33,38 +34,68 @@ export class ModuleService {
     const now = new Date().toISOString();
     const result = await db.insert(modules).values({
       ...moduleData,
+      // Set public to false if not provided
+      public: moduleData.public ?? false,
       dtc: now,
       dtm: now
     }).returning();
-    return result[0];
+
+    // Ensure public is a boolean
+    const module = {
+      ...result[0],
+      public: result[0].public === null ? false : !!result[0].public
+    };
+
+    return module;
   }
 
   /**
    * Get a module by ID
    * @param id Module ID
    * @returns Module
-   */
-  async getModuleById(id: number): Promise<Module> {
+   */  async getModuleById(id: number): Promise<Module> {
     const result = await db.select().from(modules).where(eq(modules.id, id));
 
     if (result.length === 0) {
       throw new NotFoundError("Module not found");
     }
 
-    // Get associated courses
-    const moduleWithCourses = await this.addCoursesToModule(result[0]);
+    // Ensure public is a boolean and get associated courses
+    const moduleWithBoolean = this.ensurePublicIsBoolean(result[0]);
+    const moduleWithCourses = await this.addCoursesToModule(moduleWithBoolean);
     return moduleWithCourses;
   }
-
   /**
    * Get all modules
    * @returns Array of modules
-   */
-  async getAllModules(): Promise<Module[]> {
+   */  async getAllModules(): Promise<Module[]> {
     const allModules = await db.select().from(modules);
+
+    // Ensure public is boolean for all modules
+    const modulesWithBoolean = allModules.map(module => this.ensurePublicIsBoolean(module));
+
     // Add courses to each module
     const modulesWithCourses = await Promise.all(
-      allModules.map(module => this.addCoursesToModule(module))
+      modulesWithBoolean.map(module => this.addCoursesToModule(module))
+    );
+    return modulesWithCourses;
+  }
+
+  /**
+   * Get all public modules
+   * @returns Array of public modules
+   */  async getPublicModules(): Promise<Module[]> {
+    const publicModules = await db
+      .select()
+      .from(modules)
+      .where(eq(modules.public, true));
+
+    // Ensure public is boolean for all modules
+    const modulesWithBoolean = publicModules.map(module => this.ensurePublicIsBoolean(module));
+
+    // Add courses to each module
+    const modulesWithCourses = await Promise.all(
+      modulesWithBoolean.map(module => this.addCoursesToModule(module))
     );
     return modulesWithCourses;
   }
@@ -74,8 +105,7 @@ export class ModuleService {
    * @param id Module ID
    * @param moduleData Module data to update
    * @returns Updated module
-   */
-  async updateModule(id: number, moduleData: Partial<NewModule>): Promise<Module> {
+   */  async updateModule(id: number, moduleData: Partial<NewModule>): Promise<Module> {
     // Update the timestamp
     const now = new Date().toISOString();
     const result = await db
@@ -91,8 +121,9 @@ export class ModuleService {
       throw new NotFoundError("Module not found");
     }
 
-    // Get associated courses
-    const moduleWithCourses = await this.addCoursesToModule(result[0]);
+    // Ensure public is a boolean and get associated courses
+    const moduleWithBoolean = this.ensurePublicIsBoolean(result[0]);
+    const moduleWithCourses = await this.addCoursesToModule(moduleWithBoolean);
     return moduleWithCourses;
   }
 
@@ -117,16 +148,18 @@ export class ModuleService {
    * Get modules by owner ID
    * @param ownerId Owner ID
    * @returns Array of modules
-   */
-  async getModulesByOwnerId(ownerId: number): Promise<Module[]> {
+   */  async getModulesByOwnerId(ownerId: number): Promise<Module[]> {
     const ownersModules = await db
       .select()
       .from(modules)
       .where(eq(modules.owner_id, ownerId));
 
+    // Ensure public is boolean for all modules
+    const modulesWithBoolean = ownersModules.map(module => this.ensurePublicIsBoolean(module));
+
     // Add courses to each module
     const modulesWithCourses = await Promise.all(
-      ownersModules.map(module => this.addCoursesToModule(module))
+      modulesWithBoolean.map(module => this.addCoursesToModule(module))
     );
     return modulesWithCourses;
   }
@@ -296,8 +329,7 @@ export class ModuleService {
    * Get all modules a user is subscribed to
    * @param userId User ID
    * @returns Array of modules
-   */
-  async getSubscribedModules(userId: number): Promise<Module[]> {
+   */  async getSubscribedModules(userId: number): Promise<Module[]> {
     const subscribedModules = await db
       .select()
       .from(modules)
@@ -305,13 +337,16 @@ export class ModuleService {
         moduleSubscriptions,
         eq(moduleSubscriptions.module_id, modules.id)
       )
-      .where(eq(moduleSubscriptions.user_id, userId));    // Map the join result to the Module interface
-    const mappedModules = subscribedModules.map(join => ({
+      .where(eq(moduleSubscriptions.user_id, userId));
+
+    // Map the join result to the Module interface
+    const mappedModules = subscribedModules.map(join => this.ensurePublicIsBoolean({
       id: join.module.id,
       title: join.module.title,
       description: join.module.description,
       owner_id: join.module.owner_id,
       courses_count: join.module.courses_count,
+      public: join.module.public,
       dtc: join.module.dtc,
       dtm: join.module.dtm
     }));
@@ -340,6 +375,18 @@ export class ModuleService {
         )
       );
     return result.length > 0;
+  }
+
+  /**
+   * Ensure module public field is always a boolean
+   * @param module Module data from database
+   * @returns Module with guaranteed boolean public field
+   */
+  private ensurePublicIsBoolean(module: any): Module {
+    return {
+      ...module,
+      public: module.public === null ? false : Boolean(module.public)
+    };
   }
 }
 

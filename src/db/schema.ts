@@ -37,11 +37,11 @@ export const chats = pgTable("chat", {
 
 // Module table
 export const modules = pgTable("module", {
-  id: serial("id").primaryKey(),
-  title: varchar("title", { length: 255 }), // Renamed from 'name'
+  id: serial("id").primaryKey(), title: varchar("title", { length: 255 }), // Renamed from 'name'
   description: text("description"), // Added description field
   owner_id: integer("owner_id").references(() => users.id), // Changed user_id to owner_id
   courses_count: integer("courses_count").default(0), // Counter for associated courses
+  public: boolean("public").notNull().default(false), // Public field: not null with default false
   dtc: varchar("dtc", { length: 30 }).notNull().default("NOW()"), // Date time created
   dtm: varchar("dtm", { length: 30 }).notNull().default("NOW()"), // Date time modified
 });
