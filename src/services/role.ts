@@ -1,7 +1,7 @@
 import { db } from "../db/client";
 import { roles, userRoles, users } from "../db/schema";
 import { eq, inArray, and } from "drizzle-orm";
-import { ROLES, ROLE_PERMISSIONS, isValidRole } from "../utils/roles";
+import { ROLES, ROLE_PERMISSIONS, isValidRole, RoleType } from "../utils/roles";
 import { NotFoundError, ApiError } from "../middleware/error";
 
 // Role entity types
@@ -132,12 +132,10 @@ export class RoleService {
      */
     async updateRole(id: number, roleData: Partial<NewRole>): Promise<Role> {
         // Check if role exists
-        await this.getRoleById(id);
-
-        // Don't allow changing the role name for predefined roles
+        await this.getRoleById(id);        // Don't allow changing the role name for predefined roles
         if (roleData.name) {
             const existingRole = await this.getRoleById(id);
-            if (Object.values(ROLES).includes(existingRole.name as any) &&
+            if (Object.values(ROLES).includes(existingRole.name as RoleType) &&
                 roleData.name !== existingRole.name) {
                 throw new ApiError("Cannot change the name of a predefined role", 400);
             }
@@ -163,10 +161,8 @@ export class RoleService {
      */
     async deleteRole(id: number): Promise<boolean> {
         // Check if role exists
-        const roleToDelete = await this.getRoleById(id);
-
-        // Don't allow deleting predefined roles
-        if (Object.values(ROLES).includes(roleToDelete.name as any)) {
+        const roleToDelete = await this.getRoleById(id);        // Don't allow deleting predefined roles
+        if (Object.values(ROLES).includes(roleToDelete.name as RoleType)) {
             throw new ApiError("Cannot delete a predefined role", 400);
         }
 

@@ -46,9 +46,8 @@ async function createAdmin(email: string, password?: string) {
                 } else {
                     console.log(`ℹ️ User ${email} is already an ${ROLES.ADMIN}`);
                 }
-            } else if (password) {
-                // Create new admin user
-                const newUser = await userService.createUser(
+            } else if (password) {                // Create new admin user
+                await userService.createUser(
                     {
                         email,
                         password,

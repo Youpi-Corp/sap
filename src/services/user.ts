@@ -3,7 +3,7 @@ import { users, refreshTokens } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { hashPassword, verifyPassword } from "../utils/password";
 import { NotFoundError, ApiError } from "../middleware/error";
-import { isValidRole, getDefaultRole, ROLES } from "../utils/roles";
+import { isValidRole, getDefaultRole } from "../utils/roles";
 
 // User types
 export interface User {
@@ -146,11 +146,8 @@ export class UserService {  /**
     id: number,
     userData: NewUser,
     isAdmin: boolean = false,
-    currentUserId?: number
   ): Promise<User> {
     // Security checks
-    const isSelfUpdate = currentUserId === id;
-
     // Only admins can change roles
     if (userData.role && !isAdmin) {
       // Remove role from update data for non-admins

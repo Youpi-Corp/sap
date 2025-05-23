@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia";
 import { infoService } from "../services/info";
-import { setupAuth, LegacyRole } from "../middleware/auth";
+import { setupAuth } from "../middleware/auth";
 import { success } from "../utils/response";
 import { ROLES } from "../utils/roles";
 

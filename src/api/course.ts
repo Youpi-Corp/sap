@@ -149,10 +149,10 @@ export function setupCourseRoutes() {
           },
         },
       }
-    )    // Get courses by owner ID
-    .get(
+    )
+    .get(    // Get courses by owner ID    .get(
       "/owner/:ownerId",
-      async ({ params, requireAuth, set }) => {
+      async ({ params, requireAuth }) => {
         // Get user from JWT token
         const claims = await requireAuth();
         const userId = parseInt(claims.sub);

@@ -1,6 +1,6 @@
 import { db } from "../db/client";
 import { courses } from "../db/schema";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { NotFoundError } from "../middleware/error";
 
 // Course types
@@ -122,8 +122,10 @@ export class CourseService {
       return await db
         .select()
         .from(courses)
-        .where(eq(courses.public, true))
-        .or(eq(courses.owner_id, userId));
+        .where(or(
+          eq(courses.public, true),
+          eq(courses.owner_id, userId)
+        ));
     }
   }
 }

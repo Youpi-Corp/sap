@@ -15,7 +15,8 @@
     "migrate:multi-roles": "bun run src/db/roles-migration.ts",
     "create:admin": "bun run src/scripts/create-admin.ts",
     "init:roles": "bun run src/scripts/init-roles.ts",
-    "lint": "eslint . --ext .ts"
+    "lint": "eslint . --ext .ts",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.2",
@@ -27,7 +28,8 @@
     "drizzle-orm": "0.43.1",
     "elysia": "^1.3.1",
     "pg": "^8.16.0",
-    "postgres": "3.4.7"
+    "postgres": "3.4.7",
+    "vitest": "^3.1.4"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

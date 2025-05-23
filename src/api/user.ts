@@ -1,8 +1,8 @@
 import { Elysia, t } from "elysia";
 import { userService, type NewUser } from "../services/user"; // Import NewUser type
 import { success, error } from "../utils/response";
-import { setupAuth, LegacyRole } from "../middleware/auth";
-import { ROLES, RoleType } from "../utils/roles";
+import { setupAuth } from "../middleware/auth";
+import { ROLES } from "../utils/roles";
 
 /**
  * Setup user routes
@@ -146,13 +146,11 @@ export function setupUserRoutes() {
           if (authResult) {
             set.status = authResult.statusCode;
             return authResult;
-          }
-
-          // Admin is creating the user, so pass isAdmin=true
-          const claims = await requireAuth();
-          const newUser = await userService.createUser(body as NewUser, true);
+          }          // Admin is creating the user, so pass isAdmin=true
+          await requireAuth();
+          const createdUser = await userService.createUser(body as NewUser, true);
           set.status = 201;
-          return success(newUser, 201);
+          return success(createdUser, 201);
         },
         {
           body: t.Object({
@@ -246,16 +244,15 @@ export function setupUserRoutes() {
           },
         }
       )      // Update user (with proper auth checks)
-      .put(
-        "/update/:userId",
-        async ({ params, body, requireAuth, guardRoles, set }) => {
+      .put("/update/:userId",
+        async ({ params, body, requireAuth, set }) => {
           const userIdToUpdate = parseInt(params.userId, 10);
           const claims = await requireAuth();
           const currentUserId = parseInt(claims.sub);
 
           // Determine if this is a self-update or if admin is updating someone else
           const isSelfUpdate = currentUserId === userIdToUpdate;
-          const isAdmin = claims.role === ROLES.ADMIN;
+          const isAdmin = claims.roles.includes(ROLES.ADMIN);
 
           // Only allow users to update themselves, unless they're an admin
           if (!isSelfUpdate && !isAdmin) {
@@ -267,8 +264,7 @@ export function setupUserRoutes() {
           const updatedUser = await userService.updateUser(
             userIdToUpdate,
             body as Partial<NewUser>,
-            isAdmin,
-            currentUserId
+            isAdmin
           );
           return success(updatedUser);
         },

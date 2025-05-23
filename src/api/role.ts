@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia";
 import { roleService } from "../services/role";
-import { success, error } from "../utils/response";
+import { success } from "../utils/response";
 import { setupAuth } from "../middleware/auth";
 import { ROLES } from "../utils/roles";
 

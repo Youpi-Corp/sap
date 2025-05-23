@@ -2,7 +2,7 @@ import { Elysia, t } from "elysia";
 import { userService, LoginRequest } from "../services/user";
 import { success, error } from "../utils/response";
 import { setupAuth } from "../middleware/auth";
-import { getDefaultRole, ROLES } from "../utils/roles";
+import { ROLES } from "../utils/roles";
 
 /**
  * Setup auth routes
@@ -15,13 +15,12 @@ export function setupAuthRoutes() {
     .post(
       "/login",
       async ({ body, set, setAuthCookie }) => {
-        try {
-          // Validate request
+        try {          // Validate request
           const { email, password } = body as LoginRequest;          // Authenticate user
           const user = await userService.authenticate(email, password);
 
           // Set JWT token in HTTP-only cookie with user's roles
-          const token = await setAuthCookie(user.id);
+          await setAuthCookie(user.id);
 
           // Get user's roles from the database for the response
           const { roleService } = await import("../services/role");

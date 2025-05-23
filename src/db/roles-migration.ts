@@ -1,6 +1,5 @@
 import { db } from "./client";
-import { roles, userRoles, users } from "./schema";
-import { eq } from "drizzle-orm";
+import { users } from "./schema";
 import { sql } from "drizzle-orm";
 import { roleService } from "../services/role";
 import { ROLES } from "../utils/roles";
@@ -55,7 +54,7 @@ export async function migrateToMultiRoles() {
                 }
             } else {
                 // Determine which role(s) to assign based on legacy role
-                let rolesToAssign: string[] = [];
+                const rolesToAssign: string[] = [];
 
                 switch (user.role) {
                     case "3":

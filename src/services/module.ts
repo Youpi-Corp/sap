@@ -113,9 +113,9 @@ export class ModuleService {
         .values({ user_id: userId, module_id: moduleId })
         .returning();
       return result.length > 0;
-    } catch (error) {
+    } catch (error: unknown) {
       // If there's a unique constraint violation, the user is already subscribed
-      if (error.code === '23505') { // Unique violation
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') { // Unique violation
         return false;
       }
       throw error;
