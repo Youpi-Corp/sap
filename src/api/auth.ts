@@ -63,10 +63,6 @@ export function setupAuthRoutes() {
         try {
           // Ensure new registrants get the USER role, not admin
           const userData = { ...body };
-          if (userData.role) {
-            // Public registration always creates normal users, not admins
-            userData.role = ROLES.USER;
-          }
 
           // Create user with isAdmin=false to prevent role escalation
           const user = await userService.createUser(userData, false);
@@ -90,8 +86,7 @@ export function setupAuthRoutes() {
         body: t.Object({
           pseudo: t.Optional(t.String()),
           email: t.String(),
-          password: t.String(),
-          role: t.Optional(t.String()),
+          password: t.String()
         }),
         detail: {
           tags: ["Authentication"],
