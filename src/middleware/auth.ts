@@ -62,8 +62,8 @@ export function setupAuth() {
                         httpOnly: true,
                         path: "/",
                         maxAge: 86400, // 1 day in seconds
-                        secure: process.env.NODE_ENV === "production", // Only secure in production
-                        sameSite: process.env.NODE_ENV === "production" ? "lax" : "none", // SameSite policy
+                        secure: true,
+                        sameSite: "none"
                     });
 
                     return token;
