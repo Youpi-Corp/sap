@@ -67,13 +67,11 @@ export function setupModuleRoutes() {
           try {
             // Get user from JWT token if available
             let userId: number | null = null;
-            let userRoles: string[] = [];
-
-            try {
+            let userRoles: string[] = []; try {
               const claims = await requireAuth();
               userId = parseInt(claims.sub);
               userRoles = claims.roles;
-            } catch (error) {
+            } catch {
               // Continue without auth - will only allow access to public modules
             }
 
@@ -219,11 +217,11 @@ export function setupModuleRoutes() {
           set.status = 201;
           return success(module, 201);
         }, {
-          body: t.Object({
-            title: t.String(), // Changed from 'name'
-            description: t.Optional(t.String()), // Added description
-            public: t.Optional(t.Boolean()), // Added public flag with default value
-          }),
+        body: t.Object({
+          title: t.String(), // Changed from 'name'
+          description: t.Optional(t.String()), // Added description
+          public: t.Optional(t.Boolean()), // Added public flag with default value
+        }),
         detail: {
           tags: ["Modules"],
           summary: "Create a new module",
@@ -258,11 +256,11 @@ export function setupModuleRoutes() {
           const updatedModule = await moduleService.updateModule(moduleId, body);
           return success(updatedModule);
         }, {
-          body: t.Object({
-            title: t.Optional(t.String()), // Changed from 'name'
-            description: t.Optional(t.String()), // Added description
-            public: t.Optional(t.Boolean()), // Added public flag
-          }),
+        body: t.Object({
+          title: t.Optional(t.String()), // Changed from 'name'
+          description: t.Optional(t.String()), // Added description
+          public: t.Optional(t.Boolean()), // Added public flag
+        }),
         detail: {
           tags: ["Modules"],
           summary: "Update a module",

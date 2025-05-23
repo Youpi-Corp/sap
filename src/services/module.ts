@@ -376,17 +376,16 @@ export class ModuleService {  /**
       );
     return result.length > 0;
   }
-
   /**
    * Ensure module public field is always a boolean
    * @param module Module data from database
    * @returns Module with guaranteed boolean public field
    */
-  private ensurePublicIsBoolean(module: any): Module {
+  private ensurePublicIsBoolean(module: Partial<Module>): Module {
     return {
       ...module,
       public: module.public === null ? false : Boolean(module.public)
-    };
+    } as Module;
   }
 }
 
