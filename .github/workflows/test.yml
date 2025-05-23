@@ -5,6 +5,7 @@ on:
   pull_request:
     branches:
       - main
+      - dev
 
 jobs:
   lint:
@@ -24,3 +25,32 @@ jobs:
 
       - name: Run linting
         run: bun run lint
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest # Or lock to a specific version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build project
+        run: bun run build
+
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            dist/
+            package.json
+            bun.lockb
+            drizzle/       # Add the drizzle folder containing SQL migrations
+            # Add any other files needed for production
