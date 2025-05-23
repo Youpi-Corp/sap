@@ -41,9 +41,20 @@ export const chats = pgTable("chat", {
 // Module table
 export const modules = pgTable("module", {
   id: serial("id").primaryKey(),
-  name: varchar("name", { length: 255 }),
+  title: varchar("title", { length: 255 }), // Renamed from 'name'
+  description: text("description"), // Added description field
   content: text("content"),
   owner_id: integer("owner_id").references(() => users.id), // Changed user_id to owner_id
+  courses_count: integer("courses_count").default(0), // Counter for associated courses
+  dtc: varchar("dtc", { length: 30 }).notNull().default("NOW()"), // Date time created
+  dtm: varchar("dtm", { length: 30 }).notNull().default("NOW()"), // Date time modified
+});
+
+// Course-Module relationship (many-to-many)
+export const courseModules = pgTable("course_module", {
+  id: serial("id").primaryKey(),
+  course_id: integer("course_id").notNull().references(() => courses.id, { onDelete: "cascade" }),
+  module_id: integer("module_id").notNull().references(() => modules.id, { onDelete: "cascade" }),
 });
 
 // Asset table

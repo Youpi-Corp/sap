@@ -1,20 +1,27 @@
 import { db } from "../db/client";
-import { modules, moduleSubscriptions } from "../db/schema";
-import { eq, and } from "drizzle-orm";
+import { modules, moduleSubscriptions, courseModules, courses } from "../db/schema";
+import { eq, and, count, sql } from "drizzle-orm";
 import { NotFoundError } from "../middleware/error";
+import type { Course } from "./course"; // Import Course type as a type only
 
 // Module types
 export interface Module {
   id: number;
-  name: string | null;
+  title: string | null; // Renamed from 'name'
+  description: string | null; // Added description
   content: string | null;
-  owner_id: number | null; // Changed user_id to owner_id
+  owner_id: number | null;
+  courses_count: number | null; // Added courses count
+  dtc: string | null; // Date time created
+  dtm: string | null; // Date time modified
+  courses?: Course[]; // Optional courses array
 }
 
 export interface NewModule {
-  name: string | null;
+  title: string | null; // Renamed from 'name'
+  description?: string | null; // Added description
   content: string | null;
-  owner_id: number | null; // Changed user_id to owner_id
+  owner_id: number | null;
 }
 
 export class ModuleService {
@@ -24,7 +31,13 @@ export class ModuleService {
    * @returns Created module
    */
   async createModule(moduleData: NewModule): Promise<Module> {
-    const result = await db.insert(modules).values(moduleData).returning();
+    // Add current timestamp
+    const now = new Date().toISOString();
+    const result = await db.insert(modules).values({
+      ...moduleData,
+      dtc: now,
+      dtm: now
+    }).returning();
     return result[0];
   }
 
@@ -40,7 +53,9 @@ export class ModuleService {
       throw new NotFoundError("Module not found");
     }
 
-    return result[0];
+    // Get associated courses
+    const moduleWithCourses = await this.addCoursesToModule(result[0]);
+    return moduleWithCourses;
   }
 
   /**
@@ -48,7 +63,12 @@ export class ModuleService {
    * @returns Array of modules
    */
   async getAllModules(): Promise<Module[]> {
-    return await db.select().from(modules);
+    const allModules = await db.select().from(modules);
+    // Add courses to each module
+    const modulesWithCourses = await Promise.all(
+      allModules.map(module => this.addCoursesToModule(module))
+    );
+    return modulesWithCourses;
   }
 
   /**
@@ -58,9 +78,14 @@ export class ModuleService {
    * @returns Updated module
    */
   async updateModule(id: number, moduleData: Partial<NewModule>): Promise<Module> {
+    // Update the timestamp
+    const now = new Date().toISOString();
     const result = await db
       .update(modules)
-      .set(moduleData)
+      .set({
+        ...moduleData,
+        dtm: now
+      })
       .where(eq(modules.id, id))
       .returning();
 
@@ -68,7 +93,9 @@ export class ModuleService {
       throw new NotFoundError("Module not found");
     }
 
-    return result[0];
+    // Get associated courses
+    const moduleWithCourses = await this.addCoursesToModule(result[0]);
+    return moduleWithCourses;
   }
 
   /**
@@ -77,6 +104,9 @@ export class ModuleService {
    * @returns True if module was deleted
    */
   async deleteModule(id: number): Promise<boolean> {
+    // Delete related course-module relationships first
+    await db.delete(courseModules).where(eq(courseModules.module_id, id));
+
     const result = await db
       .delete(modules)
       .where(eq(modules.id, id))
@@ -91,10 +121,133 @@ export class ModuleService {
    * @returns Array of modules
    */
   async getModulesByOwnerId(ownerId: number): Promise<Module[]> {
-    return await db
+    const ownersModules = await db
       .select()
       .from(modules)
       .where(eq(modules.owner_id, ownerId));
+
+    // Add courses to each module
+    const modulesWithCourses = await Promise.all(
+      ownersModules.map(module => this.addCoursesToModule(module))
+    );
+    return modulesWithCourses;
+  }
+
+  /**
+   * Add a course to a module
+   * @param moduleId Module ID
+   * @param courseId Course ID
+   * @returns True if course was added successfully
+   */
+  async addCourseToModule(moduleId: number, courseId: number): Promise<boolean> {
+    try {
+      // Add the relationship
+      const result = await db
+        .insert(courseModules)
+        .values({ module_id: moduleId, course_id: courseId })
+        .returning();
+
+      // Update the courses_count
+      if (result.length > 0) {
+        await this.updateCoursesCount(moduleId);
+        return true;
+      }
+      return false;
+    } catch (error: unknown) {
+      // If there's a unique constraint violation, the relationship already exists
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Remove a course from a module
+   * @param moduleId Module ID
+   * @param courseId Course ID
+   * @returns True if course was removed successfully
+   */
+  async removeCourseFromModule(moduleId: number, courseId: number): Promise<boolean> {
+    const result = await db
+      .delete(courseModules)
+      .where(
+        and(
+          eq(courseModules.module_id, moduleId),
+          eq(courseModules.course_id, courseId)
+        )
+      )
+      .returning();
+
+    // Update the courses_count
+    if (result.length > 0) {
+      await this.updateCoursesCount(moduleId);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Get all courses associated with a module
+   * @param moduleId Module ID
+   * @returns Array of courses
+   */
+  async getModuleCourses(moduleId: number): Promise<Course[]> {
+    return await db
+      .select({
+        id: courses.id,
+        name: courses.name,
+        content: courses.content,
+        module_id: courses.module_id,
+        level: courses.level,
+        likes: courses.likes,
+        views: courses.views,
+        public: courses.public,
+        chat_id: courses.chat_id,
+        owner_id: courses.owner_id,
+      })
+      .from(courses)
+      .innerJoin(
+        courseModules,
+        eq(courseModules.course_id, courses.id)
+      )
+      .where(eq(courseModules.module_id, moduleId));
+  }
+
+  /**
+   * Update the courses count for a module
+   * @param moduleId Module ID
+   * @returns Updated count
+   */
+  private async updateCoursesCount(moduleId: number): Promise<number> {
+    // Count the courses for this module
+    const countResult = await db
+      .select({ value: count() })
+      .from(courseModules)
+      .where(eq(courseModules.module_id, moduleId));
+
+    const coursesCount = countResult[0]?.value || 0;
+
+    // Update the module
+    await db
+      .update(modules)
+      .set({ courses_count: coursesCount })
+      .where(eq(modules.id, moduleId));
+
+    return coursesCount;
+  }
+
+  /**
+   * Add courses to a module object
+   * @param module Module object
+   * @returns Module with courses
+   */
+  private async addCoursesToModule(module: Module): Promise<Module> {
+    const moduleCourses = await this.getModuleCourses(module.id);
+    return {
+      ...module,
+      courses: moduleCourses
+    };
   }
 
   /**
@@ -127,7 +280,8 @@ export class ModuleService {
    * @param userId User ID
    * @param moduleId Module ID
    * @returns True if unsubscription was successful
-   */  async unsubscribeFromModule(userId: number, moduleId: number): Promise<boolean> {
+   */
+  async unsubscribeFromModule(userId: number, moduleId: number): Promise<boolean> {
     const result = await db
       .delete(moduleSubscriptions)
       .where(
@@ -146,19 +300,32 @@ export class ModuleService {
    * @returns Array of modules
    */
   async getSubscribedModules(userId: number): Promise<Module[]> {
-    return await db
-      .select({
-        id: modules.id,
-        name: modules.name,
-        content: modules.content,
-        owner_id: modules.owner_id,
-      })
+    const subscribedModules = await db
+      .select()
       .from(modules)
       .innerJoin(
         moduleSubscriptions,
         eq(moduleSubscriptions.module_id, modules.id)
       )
       .where(eq(moduleSubscriptions.user_id, userId));
+
+    // Map the join result to the Module interface
+    const mappedModules = subscribedModules.map(join => ({
+      id: join.module.id,
+      title: join.module.title,
+      description: join.module.description,
+      content: join.module.content,
+      owner_id: join.module.owner_id,
+      courses_count: join.module.courses_count,
+      dtc: join.module.dtc,
+      dtm: join.module.dtm
+    }));
+
+    // Add courses to each module
+    const modulesWithCourses = await Promise.all(
+      mappedModules.map(module => this.addCoursesToModule(module))
+    );
+    return modulesWithCourses;
   }
 
   /**
@@ -166,7 +333,8 @@ export class ModuleService {
    * @param userId User ID
    * @param moduleId Module ID
    * @returns True if user is subscribed
-   */  async isUserSubscribed(userId: number, moduleId: number): Promise<boolean> {
+   */
+  async isUserSubscribed(userId: number, moduleId: number): Promise<boolean> {
     const result = await db
       .select()
       .from(moduleSubscriptions)
