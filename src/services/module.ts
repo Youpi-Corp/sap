@@ -9,7 +9,6 @@ export interface Module {
   id: number;
   title: string | null; // Renamed from 'name'
   description: string | null; // Added description
-  content: string | null;
   owner_id: number | null;
   courses_count: number | null; // Added courses count
   dtc: string | null; // Date time created
@@ -20,7 +19,6 @@ export interface Module {
 export interface NewModule {
   title: string | null; // Renamed from 'name'
   description?: string | null; // Added description
-  content: string | null;
   owner_id: number | null;
 }
 
@@ -307,14 +305,11 @@ export class ModuleService {
         moduleSubscriptions,
         eq(moduleSubscriptions.module_id, modules.id)
       )
-      .where(eq(moduleSubscriptions.user_id, userId));
-
-    // Map the join result to the Module interface
+      .where(eq(moduleSubscriptions.user_id, userId));    // Map the join result to the Module interface
     const mappedModules = subscribedModules.map(join => ({
       id: join.module.id,
       title: join.module.title,
       description: join.module.description,
-      content: join.module.content,
       owner_id: join.module.owner_id,
       courses_count: join.module.courses_count,
       dtc: join.module.dtc,

@@ -163,27 +163,25 @@ export function setupModuleRoutes() {
           const module = await moduleService.createModule({ ...body, owner_id: userId });
           set.status = 201;
           return success(module, 201);
-        },
-        {
-          body: t.Object({
-            title: t.String(), // Changed from 'name'
-            description: t.Optional(t.String()), // Added description
-            content: t.String(),
-          }),
-          detail: {
-            tags: ["Modules"],
-            summary: "Create a new module",
-            description: "Create a new module",
-            responses: {
-              "201": {
-                description: "Module created successfully",
-              },
-              "401": {
-                description: "Authentication required",
-              }
+        }, {
+        body: t.Object({
+          title: t.String(), // Changed from 'name'
+          description: t.Optional(t.String()), // Added description
+        }),
+        detail: {
+          tags: ["Modules"],
+          summary: "Create a new module",
+          description: "Create a new module",
+          responses: {
+            "201": {
+              description: "Module created successfully",
             },
+            "401": {
+              description: "Authentication required",
+            }
           },
-        }
+        },
+      }
       )
       // Update a module
       .put(
@@ -203,30 +201,28 @@ export function setupModuleRoutes() {
 
           const updatedModule = await moduleService.updateModule(moduleId, body);
           return success(updatedModule);
-        },
-        {
-          body: t.Object({
-            title: t.Optional(t.String()), // Changed from 'name'
-            description: t.Optional(t.String()), // Added description
-            content: t.Optional(t.String()),
-          }),
-          detail: {
-            tags: ["Modules"],
-            summary: "Update a module",
-            description: "Update a module by its ID",
-            responses: {
-              "200": {
-                description: "Module updated successfully",
-              },
-              "401": {
-                description: "Authentication required",
-              },
-              "404": {
-                description: "Module not found",
-              },
+        }, {
+        body: t.Object({
+          title: t.Optional(t.String()), // Changed from 'name'
+          description: t.Optional(t.String()), // Added description
+        }),
+        detail: {
+          tags: ["Modules"],
+          summary: "Update a module",
+          description: "Update a module by its ID",
+          responses: {
+            "200": {
+              description: "Module updated successfully",
+            },
+            "401": {
+              description: "Authentication required",
+            },
+            "404": {
+              description: "Module not found",
             },
           },
-        }
+        },
+      }
       )
       // Add a course to a module
       .post(

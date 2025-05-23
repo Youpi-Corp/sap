@@ -43,7 +43,6 @@ export const modules = pgTable("module", {
   id: serial("id").primaryKey(),
   title: varchar("title", { length: 255 }), // Renamed from 'name'
   description: text("description"), // Added description field
-  content: text("content"),
   owner_id: integer("owner_id").references(() => users.id), // Changed user_id to owner_id
   courses_count: integer("courses_count").default(0), // Counter for associated courses
   dtc: varchar("dtc", { length: 30 }).notNull().default("NOW()"), // Date time created
