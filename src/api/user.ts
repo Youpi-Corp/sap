@@ -1,7 +1,8 @@
 import { Elysia, t } from "elysia";
 import { userService, type NewUser } from "../services/user"; // Import NewUser type
 import { success, error } from "../utils/response";
-import { setupAuth, Role } from "../middleware/auth";
+import { setupAuth, LegacyRole } from "../middleware/auth";
+import { ROLES, RoleType } from "../utils/roles";
 
 /**
  * Setup user routes
@@ -136,14 +137,20 @@ export function setupUserRoutes() {
             },
           },
         }
-      )
-      // Create user (admin check removed)
+      )      // Create user (admin only)
       .post(
         "/create",
-        async ({ body, set }) => {
-          // Auth check removed
-          // Explicitly cast body to NewUser after validation by Elysia's `t.Object`
-          const newUser = await userService.createUser(body as NewUser);
+        async ({ body, set, requireAuth, guardRoles }) => {
+          // Check if user has admin role
+          const authResult = guardRoles([ROLES.ADMIN]);
+          if (authResult) {
+            set.status = authResult.statusCode;
+            return authResult;
+          }
+
+          // Admin is creating the user, so pass isAdmin=true
+          const claims = await requireAuth();
+          const newUser = await userService.createUser(body as NewUser, true);
           set.status = 201;
           return success(newUser, 201);
         },
@@ -172,15 +179,16 @@ export function setupUserRoutes() {
       .get(
         "/list",
         async ({ requireAuth, guardRoles, set }) => {
-          // // Check if user has admin role
-          // const authResult = guardRoles([Role.Admin]);
-          // if (authResult) {
-          //   set.status = authResult.statusCode;
-          //   return authResult;
-          // }
+          // Check if user has admin role
+          const authResult = guardRoles([ROLES.ADMIN]);
+          if (authResult) {
+            set.status = authResult.statusCode;
+            return authResult;
+          }
 
           // If we get here, the user is authenticated and has admin role
-          await requireAuth(); const users = await userService.getAllUsers();          // Remove sensitive data
+          await requireAuth();
+          const users = await userService.getAllUsers();// Remove sensitive data
           const safeUsers = users.map(user => {
             const { password_hash, email, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars
             return userData;
@@ -206,12 +214,18 @@ export function setupUserRoutes() {
             },
           },
         }
-      )
-      // Delete user (admin check removed)
+      )      // Delete user (admin only)
       .delete(
         "/delete/:userId",
-        async ({ params }) => {
-          // Auth check removed
+        async ({ params, requireAuth, guardRoles, set }) => {
+          // Check if user has admin role
+          const authResult = guardRoles([ROLES.ADMIN]);
+          if (authResult) {
+            set.status = authResult.statusCode;
+            return authResult;
+          }
+
+          await requireAuth();
           const userId = parseInt(params.userId, 10);
           await userService.deleteUser(userId);
           return success({ message: "User deleted" });
@@ -231,16 +245,31 @@ export function setupUserRoutes() {
             },
           },
         }
-      )
-      // Update user (auth check removed)
+      )      // Update user (with proper auth checks)
       .put(
         "/update/:userId",
-        async ({ params, body }) => {
-          // Auth check removed
+        async ({ params, body, requireAuth, guardRoles, set }) => {
           const userIdToUpdate = parseInt(params.userId, 10);
+          const claims = await requireAuth();
+          const currentUserId = parseInt(claims.sub);
+
+          // Determine if this is a self-update or if admin is updating someone else
+          const isSelfUpdate = currentUserId === userIdToUpdate;
+          const isAdmin = claims.role === ROLES.ADMIN;
+
+          // Only allow users to update themselves, unless they're an admin
+          if (!isSelfUpdate && !isAdmin) {
+            set.status = 403;
+            return error("You can only update your own profile", 403);
+          }
 
           // Explicitly cast body to Partial<NewUser> after validation by Elysia's `t.Object`
-          const updatedUser = await userService.updateUser(userIdToUpdate, body as Partial<NewUser>);
+          const updatedUser = await userService.updateUser(
+            userIdToUpdate,
+            body as Partial<NewUser>,
+            isAdmin,
+            currentUserId
+          );
           return success(updatedUser);
         },
         {

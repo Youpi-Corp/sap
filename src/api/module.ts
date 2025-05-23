@@ -1,7 +1,8 @@
 import { Elysia, t } from "elysia";
 import { moduleService } from "../services/module";
-import { success } from "../utils/response";
+import { success, error } from "../utils/response";
 import { setupAuth } from "../middleware/auth";
+import { ROLES } from "../utils/roles";
 
 /**
  * Setup module routes
@@ -284,22 +285,27 @@ export function setupModuleRoutes() {
             },
           },
         }
-      )
-      // Delete a module
+      )      // Delete a module
       .delete(
         "/delete/:moduleId",
-        async ({ params, requireAuth }) => {
+        async ({ params, requireAuth, set }) => {
           // Require authentication
-          await requireAuth();
-
-          const moduleId = parseInt(params.moduleId, 10);
-
-          // Check if the user is the owner of the module or an admin
           const claims = await requireAuth();
           const userId = parseInt(claims.sub);
+          const userRoles = claims.roles;
+
+          const moduleId = parseInt(params.moduleId, 10);
           const module = await moduleService.getModuleById(moduleId);
-          if (module.owner_id !== userId) {
-            throw new Error("You are not authorized to delete this module");
+
+          // Allow deletion if:
+          // 1. User is the module owner, OR
+          // 2. User has the ADMIN role
+          const isOwner = module.owner_id === userId;
+          const isAdmin = userRoles.includes(ROLES.ADMIN);
+
+          if (!isOwner && !isAdmin) {
+            set.status = 403;
+            return error("You are not authorized to delete this module", 403);
           }
 
           await moduleService.deleteModule(moduleId);

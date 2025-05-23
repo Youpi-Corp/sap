@@ -11,6 +11,10 @@
     "build:copy-drizzle": "copyfiles -u 1 \"drizzle/**/*\" dist",
     "start": "NODE_ENV=production bun dist/index.js",
     "migrate": "bun run dist/db/migrate.js",
+    "migrate:roles": "bun run src/db/migrate-roles.ts",
+    "migrate:multi-roles": "bun run src/db/roles-migration.ts",
+    "create:admin": "bun run src/scripts/create-admin.ts",
+    "init:roles": "bun run src/scripts/init-roles.ts",
     "lint": "eslint . --ext .ts"
   },
   "dependencies": {

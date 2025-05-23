@@ -91,7 +91,6 @@ export class CourseService {
 
     return result.length > 0;
   }
-
   /**
    * Get courses by owner ID
    * @param ownerId Owner ID
@@ -102,6 +101,30 @@ export class CourseService {
       .select()
       .from(courses)
       .where(eq(courses.owner_id, ownerId));
+  }
+
+  /**
+   * Get courses based on user roles and ID
+   * - If user is an admin, returns all courses
+   * - Otherwise, returns public courses and courses owned by the user
+   * @param userId User ID
+   * @param userRoles Array of user role names
+   * @returns Array of courses
+   */
+  async getCoursesByUserAccess(userId: number, userRoles: string[]): Promise<Course[]> {
+    const isAdmin = userRoles.includes('admin');
+
+    if (isAdmin) {
+      // Admins can see all courses
+      return this.getAllCourses();
+    } else {
+      // Regular users can see public courses and their own courses
+      return await db
+        .select()
+        .from(courses)
+        .where(eq(courses.public, true))
+        .or(eq(courses.owner_id, userId));
+    }
   }
 }
 

@@ -1,7 +1,8 @@
 import { Elysia, t } from "elysia";
 import { infoService } from "../services/info";
-import { setupAuth, Role } from "../middleware/auth";
+import { setupAuth, LegacyRole } from "../middleware/auth";
 import { success } from "../utils/response";
+import { ROLES } from "../utils/roles";
 
 /**
  * Setup info routes
@@ -64,9 +65,8 @@ export function setupInfoRoutes() {
       // Update info (admin only)
       .put(
         "/update",
-        async ({ body, guardRoles, requireAuth, set }) => {
-          // Check if user has admin role
-          const authResult = guardRoles([Role.Admin]);
+        async ({ body, guardRoles, requireAuth, set }) => {          // Check if user has admin role
+          const authResult = guardRoles([ROLES.ADMIN]);
           if (authResult) {
             // If guard returned a response, it means auth failed
             set.status = authResult.statusCode;

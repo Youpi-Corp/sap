@@ -23,8 +23,11 @@ This project provides a backend API for the Brainforest learning platform. It ha
   - Refresh tokens
   - Cookie management
 - **Role-based Access Control**:
-  - Support for multiple roles (Learner, Teacher, Designer, Admin)
-  - Authorization middleware
+  - Support for multiple roles (USER, ADMIN, TEACHER, CONTENT_CREATOR, MODERATOR)
+  - Permission-based access control
+  - Many-to-many relationship between users and roles
+  - Secure role assignment and verification
+  - Granular permission system for fine-tuned access control
 - **User Management**:
   - Create, read, update, and delete users
   - User profiles with customizable roles
@@ -162,6 +165,79 @@ To contribute to the project:
 2. Install dependencies with `bun install`
 3. Configure your local environment
 4. Launch the application in development mode with `bun run dev`
+
+## Role System Migration
+
+The application has a new role system with these key features:
+
+- **String-based roles** (`user`, `admin`) instead of numeric IDs
+- **Permission-based authorization**
+- **Enhanced security** to prevent privilege escalation
+
+### Migrating to the new role system:
+
+1. Run the role migration script to convert existing roles:
+
+   ```
+   bun run src/db/migrate-roles.ts
+   ```
+
+2. Create a new admin user or promote an existing user:
+
+   ```
+   # Promote existing user
+   bun run src/scripts/create-admin.ts admin@example.com
+
+   # Create new admin
+   bun run src/scripts/create-admin.ts admin@example.com YourSecurePassword123
+   ```
+
+## API Endpoints
+
+### Course Management API
+
+The Course Management API provides endpoints to create, read, update, and delete courses. It implements a sophisticated role-based access control system:
+
+#### Endpoints:
+
+- **GET /course/list** - List courses based on user permissions
+
+  - Admins see all courses
+  - Regular users see only public courses and their own courses
+
+- **GET /course/get/:courseId** - Get course by ID
+
+  - Access granted if:
+    - Course is public, OR
+    - User owns the course, OR
+    - User has ADMIN role
+
+- **POST /course/create** - Create a new course
+
+  - Requires:
+    - CREATE_COURSE permission or TEACHER/ADMIN role
+    - User must own the module or be an admin
+
+- **PUT /course/update/:courseId** - Update a course
+
+  - Access granted if user owns the course or has ADMIN role
+
+- **DELETE /course/delete/:courseId** - Delete a course
+
+  - Access granted if user owns the course or has ADMIN role
+
+- **GET /course/owner/:ownerId** - Get courses by owner ID
+  - When requesting your own courses or as admin: all courses
+  - Otherwise: only public courses
+
+### Permission System
+
+The Course API leverages our permission system to control access:
+
+- Teachers have the CREATE_COURSE permission
+- Course owners can manage their own content
+- Admins have full access to all courses
+- Users can only view courses they've created or public courses
 
 ## License
 

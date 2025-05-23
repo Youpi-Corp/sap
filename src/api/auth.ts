@@ -2,6 +2,7 @@ import { Elysia, t } from "elysia";
 import { userService, LoginRequest } from "../services/user";
 import { success, error } from "../utils/response";
 import { setupAuth } from "../middleware/auth";
+import { getDefaultRole, ROLES } from "../utils/roles";
 
 /**
  * Setup auth routes
@@ -16,19 +17,21 @@ export function setupAuthRoutes() {
       async ({ body, set, setAuthCookie }) => {
         try {
           // Validate request
-          const { email, password } = body as LoginRequest;
-
-          // Authenticate user
+          const { email, password } = body as LoginRequest;          // Authenticate user
           const user = await userService.authenticate(email, password);
 
-          // Set JWT token in HTTP-only cookie
-          await setAuthCookie(user.id, user.role || "1000");
+          // Set JWT token in HTTP-only cookie with user's roles
+          const token = await setAuthCookie(user.id);
+
+          // Get user's roles from the database for the response
+          const { roleService } = await import("../services/role");
+          const userRoles = await roleService.getUserRoleNames(user.id);
 
           // Return success response
           set.status = 200;
           return success({
             userId: user.id,
-            role: user.role
+            roles: userRoles.length > 0 ? userRoles : [ROLES.USER]
           });
         } catch (err: unknown) {
           // Set correct status code for authentication failures
@@ -55,13 +58,19 @@ export function setupAuthRoutes() {
           },
         },
       }
-    )
-    .post(
+    ).post(
       "/register",
       async ({ body, set }) => {
         try {
-          // Create user
-          const user = await userService.createUser(body);
+          // Ensure new registrants get the USER role, not admin
+          const userData = { ...body };
+          if (userData.role) {
+            // Public registration always creates normal users, not admins
+            userData.role = ROLES.USER;
+          }
+
+          // Create user with isAdmin=false to prevent role escalation
+          const user = await userService.createUser(userData, false);
 
           set.status = 201;
           return success(user, 201);

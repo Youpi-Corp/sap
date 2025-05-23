@@ -3,9 +3,12 @@ import { jwt } from "@elysiajs/jwt";
 import { cookie } from "@elysiajs/cookie";
 import { AuthError } from "./error";
 import { UNAUTHORIZED, FORBIDDEN } from "../utils/response";
+import { ROLES, RoleType, hasRole } from "../utils/roles";
+import { roleService } from "../services/role";
 
-// Role enum for backwards compatibility
-export enum Role {
+// Role enum for backwards compatibility with old code 
+// This will be removed in the future
+export enum LegacyRole {
     Learner = 0,
     Teacher = 1,
     Conceptor = 2,
@@ -15,7 +18,7 @@ export enum Role {
 // JWT claims interface 
 export interface JwtClaims {
     sub: string; // User ID
-    role: string; // User role as a string like "1000"
+    roles: string[]; // Array of user role names
     exp: number; // Expiration time
     iat: number; // Issued at time
 }
@@ -39,12 +42,18 @@ export function setupAuth() {
                 exp: TOKEN_EXPIRY
             })
         ).derive({ as: 'global' }, ({ jwt, cookie, set }) => {
-            return {
-                // Set JWT token as HTTP-only cookie
-                setAuthCookie: async (userId: string | number, role: string | number = Role.Learner) => {
+            return {                // Set JWT token as HTTP-only cookie
+                setAuthCookie: async (userId: string | number) => {
+                    // Get user's roles from the database
+                    const userRoles = await roleService.getUserRoleNames(Number(userId));
+
+                    // If user has no roles, assign default USER role
+                    const roles = userRoles.length > 0 ? userRoles : [ROLES.USER];
+
+                    // Create token with roles array
                     const token = await jwt.sign({
                         sub: userId.toString(),
-                        role: role.toString(),
+                        roles: roles,
                         iat: Math.floor(Date.now() / 1000)
                     });
 
@@ -53,7 +62,8 @@ export function setupAuth() {
                         httpOnly: true,
                         path: "/",
                         maxAge: 86400, // 1 day in seconds
-                        secure: process.env.NODE_ENV === "production" // Only secure in production
+                        secure: process.env.NODE_ENV === "production", // Only secure in production
+                        sameSite: "lax" // Improved security against CSRF
                     });
 
                     return token;
@@ -79,9 +89,7 @@ export function setupAuth() {
                         console.error("Error verifying token:", err);
                         return null;
                     }
-                },
-
-                // Middleware to require authentication
+                },                // Middleware to require authentication
                 requireAuth: async () => {
                     const token = cookie[COOKIE_NAME]?.value;
 
@@ -97,16 +105,24 @@ export function setupAuth() {
                         throw new AuthError("Invalid authentication token");
                     }
 
+                    // Handle both new format (roles array) and old format (single role)
+                    let roles: string[];
+                    if (Array.isArray(payload.roles)) {
+                        roles = payload.roles;
+                    } else if (payload.role) {
+                        roles = [String(payload.role)];
+                    } else {
+                        roles = [ROLES.USER]; // Default
+                    }
+
                     return {
                         sub: String(payload.sub || ''),
-                        role: String(payload.role || '0'),
+                        roles: roles,
                         exp: Number(payload.exp || 0),
                         iat: Number(payload.iat || 0)
                     };
-                },
-
-                // Helper to check if user has required role
-                guardRoles: (roles: Role[]) => {
+                },// Helper to check if user has required roles
+                guardRoles: (allowedRoles: RoleType[]) => {
                     const token = cookie[COOKIE_NAME]?.value;
 
                     if (!token) {
@@ -125,9 +141,11 @@ export function setupAuth() {
                             Buffer.from(parts[1], 'base64').toString()
                         );
 
-                        const userRole = parseInt(payload.role || "1000");
+                        // Get user's roles from token
+                        const userRoles = Array.isArray(payload.roles) ? payload.roles :
+                            (payload.role ? [payload.role] : [ROLES.USER]); // Handle both new and old format
 
-                        if (!roles.includes(userRole)) {
+                        if (!hasRole(userRoles, allowedRoles)) {
                             return FORBIDDEN;
                         }
                     } catch (err) {
@@ -138,12 +156,11 @@ export function setupAuth() {
                     return null;
                 }
             };
-        })
-        // Add validation schema for token verification
+        })        // Add validation schema for token verification
         .model({
             authToken: t.Object({
                 sub: t.String(),
-                role: t.String(),
+                roles: t.Array(t.String()),
                 exp: t.Number(),
                 iat: t.Optional(t.Number())
             })

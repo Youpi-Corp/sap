@@ -3,6 +3,7 @@ import { users, refreshTokens } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { hashPassword, verifyPassword } from "../utils/password";
 import { NotFoundError, ApiError } from "../middleware/error";
+import { isValidRole, getDefaultRole, ROLES } from "../utils/roles";
 
 // User types
 export interface User {
@@ -31,19 +32,13 @@ export interface TokenData {
   expiresIn: number;
 }
 
-export class UserService {
-  /**
+export class UserService {  /**
    * Create a new user
    * @param userData User data
+   * @param isAdmin Whether the creator is an admin (determines if role can be set)
    * @returns Created user
    */
-  async createUser(userData: NewUser): Promise<User> {
-    // Ignore the roles because its a critical security flow, will fix it later
-    // if the userData.role is defined, replace it with 1000 (Learner role)
-    if (userData.role) {
-      userData.role = "1000"; // Default to Learner role
-    }
-
+  async createUser(userData: NewUser, isAdmin: boolean = false): Promise<User> {
     // Check if email already exists
     if (userData.email) {
       const existingUser = await db
@@ -61,15 +56,43 @@ export class UserService {
     if (userData.password) {
       userToInsert.password_hash = await hashPassword(userData.password);
       delete (userToInsert as NewUser).password;
-    }
-
-    // Set default role if not provided
-    if (!userToInsert.role) {
-      userToInsert.role = "1000"; // Default to Learner role
+    }    // Handle legacy role field
+    if (isAdmin && userData.role) {
+      // Only admins can set specific roles
+      if (!isValidRole(userData.role)) {
+        throw new ApiError("Invalid role specified", 400);
+      }
+      userToInsert.role = userData.role;
+    } else {
+      // Non-admins can only create regular users
+      userToInsert.role = getDefaultRole();
     }
 
     // Insert user
     const result = await db.insert(users).values(userToInsert).returning();
+
+    // Assign default role to the new user in the user_roles table
+    const { roleService } = await import("./role");
+    try {
+      // Get the default USER role
+      const userRole = await roleService.getRoleByName(getDefaultRole());
+      await roleService.assignRoleToUser(result[0].id, userRole.id);
+
+      // If the user should have additional roles (admin creating with specific role)
+      if (isAdmin && userData.role && userData.role !== getDefaultRole()) {
+        // Get that role and assign it too
+        try {
+          const additionalRole = await roleService.getRoleByName(userData.role);
+          await roleService.assignRoleToUser(result[0].id, additionalRole.id);
+        } catch (err) {
+          // Log but don't fail if the additional role cannot be assigned
+          console.error(`Could not assign role ${userData.role} to new user:`, err);
+        }
+      }
+    } catch (err) {
+      // Log role assignment error but don't fail user creation
+      console.error("Error assigning default role to new user:", err);
+    }
 
     return result[0];
   }
@@ -111,18 +134,32 @@ export class UserService {
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users);
   }
-
   /**
    * Update a user
    * @param id User ID
    * @param userData User data to update
+   * @param isAdmin Whether the updater is an admin (determines if role can be changed)
+   * @param currentUserId ID of the user performing the update
    * @returns Updated user
    */
-  async updateUser(id: number, userData: NewUser): Promise<User> {
-    // Ignore the roles because its a critical security flow, will fix it later
-    // if the userData.role is defined, replace it with 1000 (Learner role)
-    if (userData.role) {
-      userData.role = "1000"; // Default to Learner role
+  async updateUser(
+    id: number,
+    userData: NewUser,
+    isAdmin: boolean = false,
+    currentUserId?: number
+  ): Promise<User> {
+    // Security checks
+    const isSelfUpdate = currentUserId === id;
+
+    // Only admins can change roles
+    if (userData.role && !isAdmin) {
+      // Remove role from update data for non-admins
+      delete userData.role;
+    } else if (userData.role && isAdmin) {
+      // Admins can only set valid roles
+      if (!isValidRole(userData.role)) {
+        throw new ApiError("Invalid role specified", 400);
+      }
     }
 
     // Hash password if provided
@@ -138,8 +175,6 @@ export class UserService {
       .set(userToUpdate)
       .where(eq(users.id, id))
       .returning();
-
-    console.log(result);
 
     if (result.length === 0) {
       throw new NotFoundError("User not found");

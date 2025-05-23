@@ -13,7 +13,23 @@ export const users = pgTable("user", {
   pseudo: varchar("pseudo", { length: 100 }),
   email: varchar("email", { length: 100 }),
   password_hash: text("password_hash"),
-  role: varchar("role", { length: 4 }),
+  // Keeping the role column for backward compatibility during migration
+  // Will be deprecated after full migration to the new role system
+  role: varchar("role", { length: 20 }),
+});
+
+// Role definitions table
+export const roles = pgTable("role", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 50 }).notNull().unique(),
+  description: text("description"),
+});
+
+// User-role relationships (many-to-many)
+export const userRoles = pgTable("user_role", {
+  id: serial("id").primaryKey(),
+  user_id: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role_id: integer("role_id").notNull().references(() => roles.id, { onDelete: "cascade" }),
 });
 
 // Chat table
