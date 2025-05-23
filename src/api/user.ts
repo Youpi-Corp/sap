@@ -172,17 +172,17 @@ export function setupUserRoutes() {
       .get(
         "/list",
         async ({ requireAuth, guardRoles, set }) => {
-          // Check if user has admin role
-          const authResult = guardRoles([Role.Admin]);
-          if (authResult) {
-            set.status = authResult.statusCode;
-            return authResult;
-          }
+          // // Check if user has admin role
+          // const authResult = guardRoles([Role.Admin]);
+          // if (authResult) {
+          //   set.status = authResult.statusCode;
+          //   return authResult;
+          // }
 
           // If we get here, the user is authenticated and has admin role
           await requireAuth(); const users = await userService.getAllUsers();          // Remove sensitive data
           const safeUsers = users.map(user => {
-            const { password_hash, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars
+            const { password_hash, email, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars
             return userData;
           });
 

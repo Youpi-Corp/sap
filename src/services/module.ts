@@ -1,6 +1,6 @@
 import { db } from "../db/client";
-import { modules } from "../db/schema";
-import { eq } from "drizzle-orm";
+import { modules, moduleSubscriptions } from "../db/schema";
+import { eq, and } from "drizzle-orm";
 import { NotFoundError } from "../middleware/error";
 
 // Module types
@@ -82,6 +82,100 @@ export class ModuleService {
       .where(eq(modules.id, id))
       .returning({ id: modules.id });
 
+    return result.length > 0;
+  }
+
+  /**
+   * Get modules by owner ID
+   * @param ownerId Owner ID
+   * @returns Array of modules
+   */
+  async getModulesByOwnerId(ownerId: number): Promise<Module[]> {
+    return await db
+      .select()
+      .from(modules)
+      .where(eq(modules.owner_id, ownerId));
+  }
+
+  /**
+   * Subscribe a user to a module
+   * @param userId User ID
+   * @param moduleId Module ID
+   * @returns True if subscription was successful
+   */
+  async subscribeToModule(userId: number, moduleId: number): Promise<boolean> {
+    // Check if module exists
+    await this.getModuleById(moduleId);
+
+    try {
+      const result = await db
+        .insert(moduleSubscriptions)
+        .values({ user_id: userId, module_id: moduleId })
+        .returning();
+      return result.length > 0;
+    } catch (error) {
+      // If there's a unique constraint violation, the user is already subscribed
+      if (error.code === '23505') { // Unique violation
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Unsubscribe a user from a module
+   * @param userId User ID
+   * @param moduleId Module ID
+   * @returns True if unsubscription was successful
+   */  async unsubscribeFromModule(userId: number, moduleId: number): Promise<boolean> {
+    const result = await db
+      .delete(moduleSubscriptions)
+      .where(
+        and(
+          eq(moduleSubscriptions.user_id, userId),
+          eq(moduleSubscriptions.module_id, moduleId)
+        )
+      )
+      .returning();
+    return result.length > 0;
+  }
+
+  /**
+   * Get all modules a user is subscribed to
+   * @param userId User ID
+   * @returns Array of modules
+   */
+  async getSubscribedModules(userId: number): Promise<Module[]> {
+    return await db
+      .select({
+        id: modules.id,
+        name: modules.name,
+        content: modules.content,
+        owner_id: modules.owner_id,
+      })
+      .from(modules)
+      .innerJoin(
+        moduleSubscriptions,
+        eq(moduleSubscriptions.module_id, modules.id)
+      )
+      .where(eq(moduleSubscriptions.user_id, userId));
+  }
+
+  /**
+   * Check if a user is subscribed to a module
+   * @param userId User ID
+   * @param moduleId Module ID
+   * @returns True if user is subscribed
+   */  async isUserSubscribed(userId: number, moduleId: number): Promise<boolean> {
+    const result = await db
+      .select()
+      .from(moduleSubscriptions)
+      .where(
+        and(
+          eq(moduleSubscriptions.user_id, userId),
+          eq(moduleSubscriptions.module_id, moduleId)
+        )
+      );
     return result.length > 0;
   }
 }

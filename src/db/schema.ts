@@ -81,3 +81,11 @@ export const refreshTokens = pgTable("refresh_token", {
   user_id: text("user_id").notNull(),
   expires_at: text("expires_at").notNull(),
 });
+
+// Module subscription table
+export const moduleSubscriptions = pgTable("module_subscription", {
+  id: serial("id").primaryKey(),
+  user_id: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  module_id: integer("module_id").notNull().references(() => modules.id, { onDelete: "cascade" }),
+  subscribed_at: text("subscribed_at").notNull().default("NOW()"),
+});

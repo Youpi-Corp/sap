@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia";
 import { courseService } from "../services/course";
-import { success } from "../utils/response";
+import { success, error } from "../utils/response";
 import { setupAuth } from "../middleware/auth";
 
 /**
@@ -65,14 +65,19 @@ export function setupCourseRoutes() {
           },
         },
       }
-    )
-    // Create a new course
+    )    // Create a new course
     .post(
       "/create",
       async ({ body, set, requireAuth }) => {
         // Get user from JWT token
         const claims = await requireAuth();
-        const userId = parseInt(claims.sub);
+        const userId = parseInt(claims.sub);        // Check if the user is the owner of the module
+        const moduleId = body.module_id;
+        const { moduleService } = await import("../services/module");
+        const module = await moduleService.getModuleById(moduleId); if (module.owner_id !== userId) {
+          set.status = 403; // Forbidden
+          return error("You are not authorized to create courses in this module", 403);
+        }
 
         // Create the course with the authenticated user as owner
         const course = await courseService.createCourse({ ...body, owner_id: userId });
@@ -86,29 +91,70 @@ export function setupCourseRoutes() {
           module_id: t.Number(),
           level: t.Number(),
           public: t.Boolean(),
-        }),
-        detail: {
+        }), detail: {
           tags: ["Courses"],
           summary: "Create a new course",
-          description: "Create a new course",
+          description: "Create a new course (must be the owner of the module)",
           responses: {
             "201": {
               description: "Course created successfully",
             },
             "401": {
               description: "Authentication required",
+            },
+            "403": {
+              description: "Not authorized to create courses in this module",
+            },
+            "404": {
+              description: "Module not found",
             }
           },
         },
       }
-    )    // Update a course
+    )    // Get courses by owner ID
+    .get(
+      "/owner/:ownerId",
+      async ({ params, requireAuth }) => {
+        // Require authentication
+        await requireAuth();
+
+        const ownerId = parseInt(params.ownerId, 10);
+        const courses = await courseService.getCoursesByOwnerId(ownerId);
+        return success(courses);
+      },
+      {
+        detail: {
+          tags: ["Courses"],
+          summary: "Get courses by owner ID",
+          description: "Retrieve all courses created by a specific owner",
+          responses: {
+            "200": {
+              description: "Courses found",
+            },
+            "401": {
+              description: "Authentication required",
+            },
+          },
+        },
+      }
+    )
+    // Update a course
     .put(
       "/update/:courseId",
-      async ({ params, body, requireAuth }) => {
+      async ({ params, body, requireAuth, set }) => {
         // Require authentication
         await requireAuth();
 
         const courseId = parseInt(params.courseId, 10);
+
+        // Check if the user is the owner of the course
+        const claims = await requireAuth();
+        const userId = parseInt(claims.sub);
+        const course = await courseService.getCourseById(courseId); if (course.owner_id !== userId) {
+          set.status = 403; // Forbidden
+          return error("You are not authorized to update this course", 403);
+        }
+
         const updatedCourse = await courseService.updateCourse(courseId, body);
         return success(updatedCourse);
       },
@@ -123,13 +169,15 @@ export function setupCourseRoutes() {
         detail: {
           tags: ["Courses"],
           summary: "Update a course",
-          description: "Update a course by its ID",
-          responses: {
+          description: "Update a course by its ID", responses: {
             "200": {
               description: "Course updated successfully",
             },
             "401": {
               description: "Authentication required",
+            },
+            "403": {
+              description: "Not authorized to update this course",
             },
             "404": {
               description: "Course not found",
@@ -137,15 +185,25 @@ export function setupCourseRoutes() {
           },
         },
       }
-    )
-    // Delete a course
+    )    // Delete a course
     .delete(
       "/delete/:courseId",
-      async ({ params, requireAuth }) => {
+      async ({ params, requireAuth, set }) => {
         // Require authentication
         await requireAuth();
 
         const courseId = parseInt(params.courseId, 10);
+
+        // Check if the user is the owner of the course or an admin
+        const claims = await requireAuth();
+        const userId = parseInt(claims.sub);
+        const course = await courseService.getCourseById(courseId);
+        if (course.owner_id !== userId) {
+          set.status = 403; // Forbidden
+          return error("You are not authorized to delete this course", 403);
+        }
+
+
         await courseService.deleteCourse(courseId);
         return success({ message: "Course deleted" });
       },
@@ -153,13 +211,15 @@ export function setupCourseRoutes() {
         detail: {
           tags: ["Courses"],
           summary: "Delete a course",
-          description: "Delete a course by its ID",
-          responses: {
+          description: "Delete a course by its ID", responses: {
             "200": {
               description: "Course deleted successfully",
             },
             "401": {
               description: "Authentication required",
+            },
+            "403": {
+              description: "Not authorized to delete this course",
             },
             "404": {
               description: "Course not found",

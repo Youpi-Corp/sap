@@ -14,6 +14,7 @@ export interface Course {
   views: number | null;
   public: boolean | null;
   chat_id: number | null;
+  owner_id: number | null;
 }
 
 export interface NewCourse {
@@ -89,6 +90,18 @@ export class CourseService {
     const result = await db.delete(courses).where(eq(courses.id, id)).returning();
 
     return result.length > 0;
+  }
+
+  /**
+   * Get courses by owner ID
+   * @param ownerId Owner ID
+   * @returns Array of courses
+   */
+  async getCoursesByOwnerId(ownerId: number): Promise<Course[]> {
+    return await db
+      .select()
+      .from(courses)
+      .where(eq(courses.owner_id, ownerId));
   }
 }
 
