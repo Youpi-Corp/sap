@@ -86,7 +86,7 @@ const app = new Elysia()
     console.error(`Error [${code}]:`, error);
     return {
       success: false,
-      error: error.message || "Internal Server Error",
+      error: 'message' in error ? error.message : "Internal Server Error",
       statusCode: set.status,
     };
   });

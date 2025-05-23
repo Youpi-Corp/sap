@@ -1,22 +1,35 @@
 import { Elysia, t } from "elysia";
 import { userService, type NewUser } from "../services/user"; // Import NewUser type
-import { success } from "../utils/response";
+import { success, error } from "../utils/response";
+import { setupAuth, Role } from "../middleware/auth";
 
 /**
  * Setup user routes
  */
 export function setupUserRoutes() {
+  const auth = setupAuth();
+
   return (
     new Elysia({ prefix: "/user" })
+      .use(auth)
       // Get current user
       .get(
         "/me",
-        async () => {
-          // Auth check removed
-          // Get the first user from database instead of using JWT
-          const users = await userService.getAllUsers();
-          const userData = users.length > 0 ? users[0] : {};
-          return success(userData);
+        async ({ requireAuth, set }) => {
+          try {
+            // Get user ID from JWT token
+            const claims = await requireAuth();
+            const userId = parseInt(claims.sub);            // Get user data
+            const user = await userService.getUserById(userId);
+
+            // Remove sensitive data
+            const { password_hash, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars
+
+            return success(userData);
+          } catch (err) {
+            set.status = 401;
+            return error((err as Error).message || "Authentication required", 401);
+          }
         },
         {
           detail: {
@@ -26,19 +39,24 @@ export function setupUserRoutes() {
             responses: {
               "200": {
                 description: "User profile retrieved successfully",
+              },
+              "401": {
+                description: "Authentication required",
               }
             },
           },
         }
-      )
-      // Get user by ID
+      )      // Get user by ID
       .get(
         "/get/:userId",
-        async ({ params }) => {
-          // Auth check removed
-          const userId = parseInt(params.userId, 10);
-          const userResult = await userService.getUserById(userId);
-          return success(userResult);
+        async ({ params, requireAuth }) => {          // Require authentication
+          await requireAuth(); const userId = parseInt(params.userId, 10);
+          const user = await userService.getUserById(userId);
+
+          // Remove sensitive data
+          const { password_hash, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars
+
+          return success(userData);
         },
         {
           detail: {
@@ -48,6 +66,9 @@ export function setupUserRoutes() {
             responses: {
               "200": {
                 description: "User found",
+              },
+              "401": {
+                description: "Authentication required",
               },
               "404": {
                 description: "User not found",
@@ -59,10 +80,13 @@ export function setupUserRoutes() {
       // Get user by email
       .get(
         "/get_by_email/:email",
-        async ({ params }) => {
-          // Auth check removed
-          const userResult = await userService.getUserByEmail(params.email);
-          return success(userResult);
+        async ({ params, requireAuth }) => {          // Require authentication
+          await requireAuth(); const user = await userService.getUserByEmail(params.email);
+
+          // Remove sensitive data
+          const { password_hash, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars
+
+          return success(userData);
         },
         {
           detail: {
@@ -72,6 +96,9 @@ export function setupUserRoutes() {
             responses: {
               "200": {
                 description: "User found",
+              },
+              "401": {
+                description: "Authentication required",
               },
               "404": {
                 description: "User not found",
@@ -141,24 +168,41 @@ export function setupUserRoutes() {
             },
           },
         }
-      )
-      // List all users (admin check removed)
+      )      // List all users (admin only)
       .get(
         "/list",
-        async () => {
-          // Auth check removed
-          const users = await userService.getAllUsers();
-          return success(users);
+        async ({ requireAuth, guardRoles, set }) => {
+          // Check if user has admin role
+          const authResult = guardRoles([Role.Admin]);
+          if (authResult) {
+            set.status = authResult.statusCode;
+            return authResult;
+          }
+
+          // If we get here, the user is authenticated and has admin role
+          await requireAuth(); const users = await userService.getAllUsers();          // Remove sensitive data
+          const safeUsers = users.map(user => {
+            const { password_hash, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars
+            return userData;
+          });
+
+          return success(safeUsers);
         },
         {
           detail: {
             tags: ["Users"],
             summary: "List all users",
-            description: "Get a list of all users in the system",
+            description: "Get a list of all users in the system (Admin only)",
             responses: {
               "200": {
                 description: "List of users retrieved successfully",
               },
+              "401": {
+                description: "Authentication required",
+              },
+              "403": {
+                description: "Forbidden - Admin role required",
+              }
             },
           },
         }

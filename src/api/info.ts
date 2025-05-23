@@ -1,18 +1,18 @@
 import { Elysia, t } from "elysia";
 import { infoService } from "../services/info";
 import { setupAuth, Role } from "../middleware/auth";
-import { success, UNAUTHORIZED, FORBIDDEN } from "../utils/response";
+import { success } from "../utils/response";
 
 /**
  * Setup info routes
  */
 export function setupInfoRoutes() {
-  const authPlugin = setupAuth();
+  const auth = setupAuth();
 
   return (
     new Elysia({ prefix: "/info" })
-      .use(authPlugin)
-      // Get info
+      .use(auth)
+      // Get info - publicly accessible
       .get(
         "/get",
         async ({ set }) => {
@@ -42,8 +42,7 @@ export function setupInfoRoutes() {
             },
           },
         }
-      )
-      // Alive check
+      )      // Alive check - publicly accessible
       .get(
         "/alive",
         () => {
@@ -61,18 +60,21 @@ export function setupInfoRoutes() {
             },
           },
         }
-      )      // Update info (admin only)
+      )
+      // Update info (admin only)
       .put(
         "/update",
-        async ({ body, store, set }) => {
+        async ({ body, guardRoles, requireAuth, set }) => {
           // Check if user has admin role
-          const guardRoles = (store as Record<string, unknown>).guardRoles as (roles: Role[]) => typeof UNAUTHORIZED | typeof FORBIDDEN | null;
           const authResult = guardRoles([Role.Admin]);
           if (authResult) {
             // If guard returned a response, it means auth failed
             set.status = authResult.statusCode;
             return authResult;
           }
+
+          // Verify authentication
+          await requireAuth();
 
           const updatedInfo = await infoService.updateInfo(body);
           return success(updatedInfo);
@@ -87,7 +89,7 @@ export function setupInfoRoutes() {
             summary: "Update platform information (Admin only)",
             description:
               "Update general platform information (Admin role required)",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+            security: [{ cookieAuth: [] }],
             responses: {
               "200": {
                 description: "Information updated successfully",

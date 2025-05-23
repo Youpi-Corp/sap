@@ -7,9 +7,11 @@ export default [
   ...typescriptEslint.configs.recommended,
   {
     rules: {
-      // Add any project-specific rules here
-      // For example:
-      // "@typescript-eslint/no-explicit-any": "warn"
+      // Configure no-unused-vars with ignoreRestSiblings option
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { ignoreRestSiblings: true },
+      ],
     },
   },
 ];

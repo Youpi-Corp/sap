@@ -1,25 +1,24 @@
 import { Elysia, t } from "elysia";
 import { moduleService } from "../services/module";
-import { userService } from "../services/user";
 import { success } from "../utils/response";
+import { setupAuth } from "../middleware/auth";
 
 /**
  * Setup module routes
  */
 export function setupModuleRoutes() {
-  type SetContextObj = {
-    status: number | string;
-    headers?: Record<string, string>;
-    [key: string]: any; // Allow other properties on set if any
-  };
+  const auth = setupAuth();
 
   return (
     new Elysia({ prefix: "/module" })
+      .use(auth)
       // Get all modules
       .get(
         "/list",
-        async () => {
-          // Auth check removed
+        async ({ requireAuth }) => {
+          // Require authentication
+          await requireAuth();
+
           const modules = await moduleService.getAllModules();
           return success(modules);
         },
@@ -31,16 +30,20 @@ export function setupModuleRoutes() {
             responses: {
               "200": {
                 description: "List of modules retrieved successfully",
+              },
+              "401": {
+                description: "Authentication required",
               }
             },
           },
         }
-      )
-      // Get module by ID
+      )      // Get module by ID
       .get(
         "/get/:moduleId",
-        async ({ params }) => {
-          // Auth check removed
+        async ({ params, requireAuth }) => {
+          // Require authentication
+          await requireAuth();
+
           const moduleId = parseInt(params.moduleId, 10);
           const module = await moduleService.getModuleById(moduleId);
           return success(module);
@@ -54,6 +57,9 @@ export function setupModuleRoutes() {
               "200": {
                 description: "Module found",
               },
+              "401": {
+                description: "Authentication required",
+              },
               "404": {
                 description: "Module not found",
               },
@@ -64,17 +70,13 @@ export function setupModuleRoutes() {
       // Create a new module
       .post(
         "/create",
-        async ({ body, set }) => {
-          // Auth check removed
-          // For creating a module, we'll use the first user as the owner
-          const users = await userService.getAllUsers();
-          if (!users.length || typeof users[0].id !== 'number') {
-            set.status = 404;
-            return { success: false, error: "No users available to create module", statusCode: 404 };
-          }
+        async ({ body, set, requireAuth }) => {
+          // Get user from JWT token
+          const claims = await requireAuth();
+          const userId = parseInt(claims.sub);
 
-          const creatingUser = users[0];
-          const module = await moduleService.createModule({ ...body, owner_id: creatingUser.id });
+          // Create the module with the authenticated user as owner
+          const module = await moduleService.createModule({ ...body, owner_id: userId });
           set.status = 201;
           return success(module, 201);
         },
@@ -91,18 +93,19 @@ export function setupModuleRoutes() {
               "201": {
                 description: "Module created successfully",
               },
-              "404": {
-                description: "No users available to create module",
+              "401": {
+                description: "Authentication required",
               }
             },
           },
         }
-      )
-      // Update a module
+      )      // Update a module
       .put(
         "/update/:moduleId",
-        async ({ params, body }) => {
-          // Auth check removed
+        async ({ params, body, requireAuth }) => {
+          // Require authentication
+          await requireAuth();
+
           const moduleId = parseInt(params.moduleId, 10);
           const updatedModule = await moduleService.updateModule(moduleId, body);
           return success(updatedModule);
@@ -121,6 +124,9 @@ export function setupModuleRoutes() {
               "200": {
                 description: "Module updated successfully",
               },
+              "401": {
+                description: "Authentication required",
+              },
               "404": {
                 description: "Module not found",
               },
@@ -131,8 +137,10 @@ export function setupModuleRoutes() {
       // Delete a module
       .delete(
         "/delete/:moduleId",
-        async ({ params }) => {
-          // Auth check removed
+        async ({ params, requireAuth }) => {
+          // Require authentication
+          await requireAuth();
+
           const moduleId = parseInt(params.moduleId, 10);
           await moduleService.deleteModule(moduleId);
           return success({ message: "Module deleted" });
@@ -145,6 +153,9 @@ export function setupModuleRoutes() {
             responses: {
               "200": {
                 description: "Module deleted successfully",
+              },
+              "401": {
+                description: "Authentication required",
               },
               "404": {
                 description: "Module not found",

@@ -1,15 +1,19 @@
 import { Elysia, t } from "elysia";
 import { userService, LoginRequest } from "../services/user";
 import { success, error } from "../utils/response";
+import { setupAuth } from "../middleware/auth";
 
 /**
  * Setup auth routes
  */
 export function setupAuthRoutes() {
+  const auth = setupAuth();
+
   return new Elysia({ prefix: "/auth" })
+    .use(auth)
     .post(
       "/login",
-      async ({ body, set }) => {
+      async ({ body, set, setAuthCookie }) => {
         try {
           // Validate request
           const { email, password } = body as LoginRequest;
@@ -17,11 +21,14 @@ export function setupAuthRoutes() {
           // Authenticate user
           const user = await userService.authenticate(email, password);
 
+          // Set JWT token in HTTP-only cookie
+          await setAuthCookie(user.id, user.role || "1000");
+
           // Return success response
           set.status = 200;
           return success({
             userId: user.id,
-            // No tokens needed anymore
+            role: user.role
           });
         } catch (err: unknown) {
           // Set correct status code for authentication failures
@@ -95,11 +102,11 @@ export function setupAuthRoutes() {
           },
         },
       }
-    )
-    .post(
+    ).post(
       "/logout",
-      async () => {
-        // No auth check needed, just return success
+      async ({ clearAuthCookie }) => {
+        // Clear auth cookie
+        clearAuthCookie();
         return success({ message: "Logged out successfully" });
       },
       {
@@ -110,6 +117,49 @@ export function setupAuthRoutes() {
           responses: {
             "200": {
               description: "Successfully logged out",
+            },
+          },
+        },
+      }
+    )
+    .get(
+      "/me",
+      async ({ getCurrentUserId, set }) => {
+        const userId = await getCurrentUserId();
+
+        if (!userId) {
+          set.status = 401;
+          return error("Not authenticated", 401);
+        }
+
+        try {
+          const userIdNum = parseInt(userId);
+          const user = await userService.getUserById(userIdNum);
+
+          // Don't return password hash
+          const { password_hash, ...userInfo } = user;
+
+          return success(userInfo);
+        } catch (err) {
+          set.status = 404;
+          console.error("Error fetching user:", err);
+          return error("User not found", 404);
+        }
+      },
+      {
+        detail: {
+          tags: ["Authentication"],
+          summary: "Get current user",
+          description: "Get the profile of the currently authenticated user",
+          responses: {
+            "200": {
+              description: "User profile retrieved successfully",
+            },
+            "401": {
+              description: "Not authenticated",
+            },
+            "404": {
+              description: "User not found",
             },
           },
         },
