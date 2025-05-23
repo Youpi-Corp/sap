@@ -8,13 +8,13 @@ export interface Module {
   id: number;
   name: string | null;
   content: string | null;
-  user_id: number | null;
+  owner_id: number | null; // Changed user_id to owner_id
 }
 
 export interface NewModule {
   name: string | null;
   content: string | null;
-  user_id: number | null;
+  owner_id: number | null; // Changed user_id to owner_id
 }
 
 export class ModuleService {

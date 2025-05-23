@@ -1,30 +1,25 @@
 import { Elysia, t } from "elysia";
 import { moduleService } from "../services/module";
-import { setupAuth, Role } from "../middleware/auth";
+import { userService } from "../services/user";
 import { success } from "../utils/response";
 
 /**
  * Setup module routes
  */
 export function setupModuleRoutes() {
-  const authPlugin = setupAuth();
-
-  type GuardRolesFn = (allowedRoles: Role[]) => { statusCode: number;[x: string]: unknown; } | undefined | null;
-  type SetContext = { status: number | string; headers?: Record<string, string>; };
+  type SetContextObj = {
+    status: number | string;
+    headers?: Record<string, string>;
+    [key: string]: any; // Allow other properties on set if any
+  };
 
   return (
     new Elysia({ prefix: "/module" })
-      .use(authPlugin)
       // Get all modules
       .get(
         "/list",
-        async ({ guardRoles, set }: { guardRoles: GuardRolesFn, set: SetContext }) => {
-          const authResult = guardRoles([Role.Learner, Role.Teacher, Role.Admin]);
-          if (authResult) {
-            set.status = authResult.statusCode;
-            return authResult;
-          }
-
+        async () => {
+          // Auth check removed
           const modules = await moduleService.getAllModules();
           return success(modules);
         },
@@ -33,17 +28,10 @@ export function setupModuleRoutes() {
             tags: ["Modules"],
             summary: "List all modules",
             description: "Retrieve a list of all modules",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
             responses: {
               "200": {
                 description: "List of modules retrieved successfully",
-              },
-              "401": {
-                description: "Not authenticated",
-              },
-              "403": {
-                description: "Not authorized",
-              },
+              }
             },
           },
         }
@@ -51,13 +39,8 @@ export function setupModuleRoutes() {
       // Get module by ID
       .get(
         "/get/:moduleId",
-        async ({ params, guardRoles, set }: { params: { moduleId: string }, guardRoles: GuardRolesFn, set: SetContext }) => {
-          const authResult = guardRoles([Role.Learner, Role.Teacher, Role.Admin]);
-          if (authResult) {
-            set.status = authResult.statusCode;
-            return authResult;
-          }
-
+        async ({ params }) => {
+          // Auth check removed
           const moduleId = parseInt(params.moduleId, 10);
           const module = await moduleService.getModuleById(moduleId);
           return success(module);
@@ -67,13 +50,9 @@ export function setupModuleRoutes() {
             tags: ["Modules"],
             summary: "Get module by ID",
             description: "Retrieve a module by its ID",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
             responses: {
               "200": {
                 description: "Module found",
-              },
-              "401": {
-                description: "Not authenticated",
               },
               "404": {
                 description: "Module not found",
@@ -82,17 +61,20 @@ export function setupModuleRoutes() {
           },
         }
       )
-      // Create a new module (Admin or Teacher only)
+      // Create a new module
       .post(
         "/create",
-        async ({ body, guardRoles, set }: { body: { name: string; content: string; user_id: number; }, guardRoles: GuardRolesFn, set: SetContext }) => {
-          const authResult = guardRoles([Role.Teacher, Role.Admin]);
-          if (authResult) {
-            set.status = authResult.statusCode;
-            return authResult;
+        async ({ body, set }) => {
+          // Auth check removed
+          // For creating a module, we'll use the first user as the owner
+          const users = await userService.getAllUsers();
+          if (!users.length || typeof users[0].id !== 'number') {
+            set.status = 404;
+            return { success: false, error: "No users available to create module", statusCode: 404 };
           }
 
-          const module = await moduleService.createModule(body);
+          const creatingUser = users[0];
+          const module = await moduleService.createModule({ ...body, owner_id: creatingUser.id });
           set.status = 201;
           return success(module, 201);
         },
@@ -100,37 +82,27 @@ export function setupModuleRoutes() {
           body: t.Object({
             name: t.String(),
             content: t.String(),
-            user_id: t.Number(),
           }),
           detail: {
             tags: ["Modules"],
             summary: "Create a new module",
-            description: "Create a new module (Admin or Teacher only)",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+            description: "Create a new module",
             responses: {
               "201": {
                 description: "Module created successfully",
               },
-              "401": {
-                description: "Not authenticated",
-              },
-              "403": {
-                description: "Not authorized",
-              },
+              "404": {
+                description: "No users available to create module",
+              }
             },
           },
         }
       )
-      // Update a module (Admin or Teacher only)
+      // Update a module
       .put(
         "/update/:moduleId",
-        async ({ params, body, guardRoles, set }: { params: { moduleId: string }, body: { name?: string; content?: string; user_id?: number; }, guardRoles: GuardRolesFn, set: SetContext }) => {
-          const authResult = guardRoles([Role.Teacher, Role.Admin]);
-          if (authResult) {
-            set.status = authResult.statusCode;
-            return authResult;
-          }
-
+        async ({ params, body }) => {
+          // Auth check removed
           const moduleId = parseInt(params.moduleId, 10);
           const updatedModule = await moduleService.updateModule(moduleId, body);
           return success(updatedModule);
@@ -144,17 +116,10 @@ export function setupModuleRoutes() {
           detail: {
             tags: ["Modules"],
             summary: "Update a module",
-            description: "Update a module by its ID (Admin or Teacher only)",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+            description: "Update a module by its ID",
             responses: {
               "200": {
                 description: "Module updated successfully",
-              },
-              "401": {
-                description: "Not authenticated",
-              },
-              "403": {
-                description: "Not authorized",
               },
               "404": {
                 description: "Module not found",
@@ -163,38 +128,23 @@ export function setupModuleRoutes() {
           },
         }
       )
-      // Delete a module (Admin only)
+      // Delete a module
       .delete(
         "/delete/:moduleId",
-        async ({ params, guardRoles, set }: { params: { moduleId: string }, guardRoles: GuardRolesFn, set: SetContext }) => {
-          const authResult = guardRoles([Role.Admin]);
-          if (authResult) {
-            set.status = authResult.statusCode;
-            return authResult;
-          }
-
+        async ({ params }) => {
+          // Auth check removed
           const moduleId = parseInt(params.moduleId, 10);
           await moduleService.deleteModule(moduleId);
           return success({ message: "Module deleted" });
         },
         {
-          params: t.Object({
-            moduleId: t.String(),
-          }),
           detail: {
             tags: ["Modules"],
             summary: "Delete a module",
-            description: "Delete a module by its ID (Admin only)",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+            description: "Delete a module by its ID",
             responses: {
               "200": {
                 description: "Module deleted successfully",
-              },
-              "401": {
-                description: "Not authenticated",
-              },
-              "403": {
-                description: "Not authorized",
               },
               "404": {
                 description: "Module not found",

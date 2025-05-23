@@ -27,7 +27,7 @@ export const modules = pgTable("module", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }),
   content: text("content"),
-  user_id: integer("user_id").references(() => users.id),
+  owner_id: integer("owner_id").references(() => users.id), // Changed user_id to owner_id
 });
 
 // Asset table
@@ -54,6 +54,7 @@ export const courses = pgTable("course", {
   views: integer("views"),
   public: boolean("public"),
   chat_id: integer("chat_id").references(() => chats.id),
+  owner_id: integer("owner_id").references(() => users.id), // Changed user_id to owner_id
 });
 
 // Subscription table

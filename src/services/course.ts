@@ -22,6 +22,7 @@ export interface NewCourse {
   module_id: number;
   level: number;
   public: boolean;
+  owner_id: number; // Changed user_id to owner_id
 }
 
 export class CourseService {

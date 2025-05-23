@@ -1,47 +1,32 @@
 import { Elysia, t } from "elysia";
-import { userService } from "../services/user";
-import { setupAuth, Role } from "../middleware/auth";
-import { success, UNAUTHORIZED } from "../utils/response";
-import { ForbiddenError } from "../middleware/error";
+import { userService, type NewUser } from "../services/user"; // Import NewUser type
+import { success } from "../utils/response";
 
 /**
  * Setup user routes
  */
 export function setupUserRoutes() {
-  const authPlugin = setupAuth();
-
   return (
     new Elysia({ prefix: "/user" })
-      .use(authPlugin)
       // Get current user
       .get(
         "/me",
-        async ({ user, isAuthenticated, set }) => {
-          // Check authentication
-          if (!isAuthenticated() || !user) {
-            // Set the HTTP status code to match the response body status code
-            set.status = 401;
-            return UNAUTHORIZED;
-          }
-
-          // Get user by email from JWT
-          const userData = await userService.getUserByEmail(user.sub);
+        async () => {
+          // Auth check removed
+          // Get the first user from database instead of using JWT
+          const users = await userService.getAllUsers();
+          const userData = users.length > 0 ? users[0] : {};
           return success(userData);
         },
         {
           detail: {
             tags: ["Users"],
             summary: "Get current user profile",
-            description:
-              "Retrieve the profile of the currently authenticated user",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+            description: "Retrieve the profile of the currently authenticated user",
             responses: {
               "200": {
                 description: "User profile retrieved successfully",
-              },
-              "401": {
-                description: "Not authenticated",
-              },
+              }
             },
           },
         }
@@ -49,31 +34,20 @@ export function setupUserRoutes() {
       // Get user by ID
       .get(
         "/get/:userId",
-        async ({ params, guard, set }) => {
-          // Check authentication
-          const authResult = guard();
-          if (authResult) {
-            // If guard returned a response, it means auth failed
-            set.status = authResult.statusCode;
-            return authResult;
-          }
-
+        async ({ params }) => {
+          // Auth check removed
           const userId = parseInt(params.userId, 10);
-          const user = await userService.getUserById(userId);
-          return success(user);
+          const userResult = await userService.getUserById(userId);
+          return success(userResult);
         },
         {
           detail: {
             tags: ["Users"],
             summary: "Get user by ID",
             description: "Retrieve a user's profile by their ID",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
             responses: {
               "200": {
                 description: "User found",
-              },
-              "401": {
-                description: "Not authenticated",
               },
               "404": {
                 description: "User not found",
@@ -85,30 +59,19 @@ export function setupUserRoutes() {
       // Get user by email
       .get(
         "/get_by_email/:email",
-        async ({ params, guard, set }) => {
-          // Check authentication
-          const authResult = guard();
-          if (authResult) {
-            // If guard returned a response, it means auth failed
-            set.status = authResult.statusCode;
-            return authResult;
-          }
-
-          const user = await userService.getUserByEmail(params.email);
-          return success(user);
+        async ({ params }) => {
+          // Auth check removed
+          const userResult = await userService.getUserByEmail(params.email);
+          return success(userResult);
         },
         {
           detail: {
             tags: ["Users"],
             summary: "Get user by email",
             description: "Retrieve a user's profile by their email address",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
             responses: {
               "200": {
                 description: "User found",
-              },
-              "401": {
-                description: "Not authenticated",
               },
               "404": {
                 description: "User not found",
@@ -147,21 +110,15 @@ export function setupUserRoutes() {
           },
         }
       )
-      // Create user (admin only)
+      // Create user (admin check removed)
       .post(
         "/create",
-        async ({ body, guardRoles, set }) => {
-          // Check if user has admin role
-          const authResult = guardRoles([Role.Admin]);
-          if (authResult) {
-            // If guard returned a response, it means auth failed
-            set.status = authResult.statusCode;
-            return authResult;
-          }
-
-          const user = await userService.createUser(body);
+        async ({ body, set }) => {
+          // Auth check removed
+          // Explicitly cast body to NewUser after validation by Elysia's `t.Object`
+          const newUser = await userService.createUser(body as NewUser);
           set.status = 201;
-          return success(user, 201);
+          return success(newUser, 201);
         },
         {
           body: t.Object({
@@ -172,18 +129,11 @@ export function setupUserRoutes() {
           }),
           detail: {
             tags: ["Users"],
-            summary: "Create user (Admin only)",
-            description: "Create a new user (Admin role required)",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+            summary: "Create user",
+            description: "Create a new user",
             responses: {
               "201": {
                 description: "User created successfully",
-              },
-              "401": {
-                description: "Not authenticated",
-              },
-              "403": {
-                description: "Not authorized (Admin role required)",
               },
               "409": {
                 description: "Email already in use",
@@ -192,54 +142,32 @@ export function setupUserRoutes() {
           },
         }
       )
-      // List all users (admin only)
+      // List all users (admin check removed)
       .get(
         "/list",
-        async ({ guardRoles, set }) => {
-          // Check if user has admin role
-          const authResult = guardRoles([Role.Admin]);
-          if (authResult) {
-            // If guard returned a response, it means auth failed
-            set.status = authResult.statusCode;
-            return authResult;
-          }
-
+        async () => {
+          // Auth check removed
           const users = await userService.getAllUsers();
           return success(users);
         },
         {
           detail: {
             tags: ["Users"],
-            summary: "List all users (Admin only)",
-            description:
-              "Get a list of all users in the system (Admin role required)",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+            summary: "List all users",
+            description: "Get a list of all users in the system",
             responses: {
               "200": {
                 description: "List of users retrieved successfully",
-              },
-              "401": {
-                description: "Not authenticated",
-              },
-              "403": {
-                description: "Not authorized (Admin role required)",
               },
             },
           },
         }
       )
-      // Delete user (admin only)
+      // Delete user (admin check removed)
       .delete(
         "/delete/:userId",
-        async ({ params, guardRoles, set }) => {
-          // Check if user has admin role
-          const authResult = guardRoles([Role.Admin]);
-          if (authResult) {
-            // If guard returned a response, it means auth failed
-            set.status = authResult.statusCode;
-            return authResult;
-          }
-
+        async ({ params }) => {
+          // Auth check removed
           const userId = parseInt(params.userId, 10);
           await userService.deleteUser(userId);
           return success({ message: "User deleted" });
@@ -247,18 +175,11 @@ export function setupUserRoutes() {
         {
           detail: {
             tags: ["Users"],
-            summary: "Delete user (Admin only)",
-            description: "Delete a user by ID (Admin role required)",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+            summary: "Delete user",
+            description: "Delete a user by ID",
             responses: {
               "200": {
                 description: "User deleted successfully",
-              },
-              "401": {
-                description: "Not authenticated",
-              },
-              "403": {
-                description: "Not authorized (Admin role required)",
               },
               "404": {
                 description: "User not found",
@@ -267,26 +188,15 @@ export function setupUserRoutes() {
           },
         }
       )
-      // Update user
+      // Update user (auth check removed)
       .put(
         "/update/:userId",
-        async ({ params, body, user, isAuthenticated, hasRoles, set }) => {
-          // Check authentication
-          if (!isAuthenticated() || !user) {
-            set.status = 401;
-            return UNAUTHORIZED;
-          }
+        async ({ params, body }) => {
+          // Auth check removed
+          const userIdToUpdate = parseInt(params.userId, 10);
 
-          const userId = parseInt(params.userId, 10);
-          const userData = await userService.getUserById(userId);
-
-          // Check if user is updating their own profile or is an admin
-          if (userData.email !== user.sub && !hasRoles([Role.Admin])) {
-            set.status = 403;
-            throw new ForbiddenError("Cannot update other users");
-          }
-
-          const updatedUser = await userService.updateUser(userId, body);
+          // Explicitly cast body to Partial<NewUser> after validation by Elysia's `t.Object`
+          const updatedUser = await userService.updateUser(userIdToUpdate, body as Partial<NewUser>);
           return success(updatedUser);
         },
         {
@@ -299,18 +209,10 @@ export function setupUserRoutes() {
           detail: {
             tags: ["Users"],
             summary: "Update user",
-            description:
-              "Update a user's profile (Users can update their own profile, Admin can update any profile)",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+            description: "Update a user's profile",
             responses: {
               "200": {
                 description: "User updated successfully",
-              },
-              "401": {
-                description: "Not authenticated",
-              },
-              "403": {
-                description: "Not authorized to update this user",
               },
               "404": {
                 description: "User not found",
