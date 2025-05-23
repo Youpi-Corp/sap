@@ -63,7 +63,7 @@ export function setupAuth() {
                         path: "/",
                         maxAge: 86400, // 1 day in seconds
                         secure: process.env.NODE_ENV === "production", // Only secure in production
-                        sameSite: "lax" // Improved security against CSRF
+                        sameSite: process.env.NODE_ENV === "production" ? "lax" : "none", // SameSite policy
                     });
 
                     return token;
