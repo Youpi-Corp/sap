@@ -46,13 +46,6 @@ export const modules = pgTable("module", {
   dtm: varchar("dtm", { length: 30 }).notNull().default("NOW()"), // Date time modified
 });
 
-// Course-Module relationship (many-to-many)
-export const courseModules = pgTable("course_module", {
-  id: serial("id").primaryKey(),
-  course_id: integer("course_id").notNull().references(() => courses.id, { onDelete: "cascade" }),
-  module_id: integer("module_id").notNull().references(() => modules.id, { onDelete: "cascade" }),
-});
-
 // Asset table
 export const assets = pgTable("asset", {
   id: serial("id").primaryKey(),

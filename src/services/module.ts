@@ -1,5 +1,5 @@
 import { db } from "../db/client";
-import { modules, moduleSubscriptions, courseModules, courses } from "../db/schema";
+import { modules, moduleSubscriptions, courses } from "../db/schema";
 import { eq, and, count } from "drizzle-orm";
 import { NotFoundError } from "../middleware/error";
 import type { Course } from "./course"; // Import Course type as a type only
@@ -126,15 +126,17 @@ export class ModuleService {  /**
     const moduleWithCourses = await this.addCoursesToModule(moduleWithBoolean);
     return moduleWithCourses;
   }
-
   /**
    * Delete a module
    * @param id Module ID
    * @returns True if module was deleted
    */
   async deleteModule(id: number): Promise<boolean> {
-    // Delete related course-module relationships first
-    await db.delete(courseModules).where(eq(courseModules.module_id, id));
+    // Update any courses associated with this module to have null module_id
+    await db
+      .update(courses)
+      .set({ module_id: null })
+      .where(eq(courses.module_id, id));
 
     const result = await db
       .delete(modules)
@@ -163,7 +165,6 @@ export class ModuleService {  /**
     );
     return modulesWithCourses;
   }
-
   /**
    * Add a course to a module
    * @param moduleId Module ID
@@ -172,10 +173,11 @@ export class ModuleService {  /**
    */
   async addCourseToModule(moduleId: number, courseId: number): Promise<boolean> {
     try {
-      // Add the relationship
+      // Update the course to set its module_id
       const result = await db
-        .insert(courseModules)
-        .values({ module_id: moduleId, course_id: courseId })
+        .update(courses)
+        .set({ module_id: moduleId })
+        .where(eq(courses.id, courseId))
         .returning();
 
       // Update the courses_count
@@ -184,15 +186,10 @@ export class ModuleService {  /**
         return true;
       }
       return false;
-    } catch (error: unknown) {
-      // If there's a unique constraint violation, the relationship already exists
-      if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
-        return false;
-      }
+    } catch (error) {
       throw error;
     }
   }
-
   /**
    * Remove a course from a module
    * @param moduleId Module ID
@@ -200,14 +197,26 @@ export class ModuleService {  /**
    * @returns True if course was removed successfully
    */
   async removeCourseFromModule(moduleId: number, courseId: number): Promise<boolean> {
-    const result = await db
-      .delete(courseModules)
+    // First, check if the course belongs to this module
+    const courseCheck = await db
+      .select()
+      .from(courses)
       .where(
         and(
-          eq(courseModules.module_id, moduleId),
-          eq(courseModules.course_id, courseId)
+          eq(courses.id, courseId),
+          eq(courses.module_id, moduleId)
         )
-      )
+      );
+
+    if (courseCheck.length === 0) {
+      return false; // Course not found or not in this module
+    }
+
+    // Update the course to remove the module_id
+    const result = await db
+      .update(courses)
+      .set({ module_id: null })
+      .where(eq(courses.id, courseId))
       .returning();
 
     // Update the courses_count
@@ -217,7 +226,6 @@ export class ModuleService {  /**
     }
     return false;
   }
-
   /**
    * Get all courses associated with a module
    * @param moduleId Module ID
@@ -238,24 +246,19 @@ export class ModuleService {  /**
         owner_id: courses.owner_id,
       })
       .from(courses)
-      .innerJoin(
-        courseModules,
-        eq(courseModules.course_id, courses.id)
-      )
-      .where(eq(courseModules.module_id, moduleId));
+      .where(eq(courses.module_id, moduleId));
   }
-
   /**
    * Update the courses count for a module
    * @param moduleId Module ID
    * @returns Updated count
    */
   private async updateCoursesCount(moduleId: number): Promise<number> {
-    // Count the courses for this module
+    // Count the courses for this module directly using the courses table
     const countResult = await db
       .select({ value: count() })
-      .from(courseModules)
-      .where(eq(courseModules.module_id, moduleId));
+      .from(courses)
+      .where(eq(courses.module_id, moduleId));
 
     const coursesCount = countResult[0]?.value || 0;
 

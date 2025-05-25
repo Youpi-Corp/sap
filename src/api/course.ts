@@ -118,7 +118,7 @@ export function setupCourseRoutes() {
         }
 
         // Create the course with the authenticated user as owner
-        const course = await courseService.createCourse({ ...body, owner_id: userId });
+        const course = await courseService.createCourseAndUpdateModule({ ...body, owner_id: userId });
         set.status = 201;
         return success(course, 201);
       },
@@ -208,11 +208,10 @@ export function setupCourseRoutes() {
         const isAdmin = userRoles.includes(ROLES.ADMIN);
 
         if (!isOwner && !isAdmin) {
-          set.status = 403; // Forbidden
-          return error("You are not authorized to update this course", 403);
+          set.status = 403; // Forbidden          return error("You are not authorized to update this course", 403);
         }
 
-        const updatedCourse = await courseService.updateCourse(courseId, body);
+        const updatedCourse = await courseService.updateCourseAndModules(courseId, body);
         return success(updatedCourse);
       },
       {
@@ -262,11 +261,10 @@ export function setupCourseRoutes() {
         const isAdmin = userRoles.includes(ROLES.ADMIN);
 
         if (!isOwner && !isAdmin) {
-          set.status = 403; // Forbidden
-          return error("You are not authorized to delete this course", 403);
+          set.status = 403; // Forbidden          return error("You are not authorized to delete this course", 403);
         }
 
-        await courseService.deleteCourse(courseId);
+        await courseService.deleteCourseAndUpdateModule(courseId);
         return success({ message: "Course deleted" });
       }, {
       detail: {
