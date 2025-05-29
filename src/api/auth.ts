@@ -86,7 +86,9 @@ export function setupAuthRoutes() {
         body: t.Object({
           pseudo: t.Optional(t.String()),
           email: t.String(),
-          password: t.String()
+          password: t.String(),
+          biography: t.Optional(t.String()),
+          profile_picture: t.Optional(t.String())
         }),
         detail: {
           tags: ["Authentication"],

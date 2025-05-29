@@ -13,6 +13,8 @@ export const users = pgTable("user", {
   pseudo: varchar("pseudo", { length: 100 }),
   email: varchar("email", { length: 100 }),
   password_hash: text("password_hash"),
+  biography: text("biography"),
+  profile_picture: text("profile_picture"),
 });
 
 // Role definitions table

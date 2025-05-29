@@ -171,6 +171,8 @@ export function setupUserRoutes() {
             email: t.String(),
             password: t.String(),
             roles: t.Optional(t.Array(t.String())),
+            biography: t.Optional(t.String()),
+            profile_picture: t.Optional(t.String()),
           }),
           detail: {
             tags: ["Users"],
@@ -296,6 +298,8 @@ export function setupUserRoutes() {
             email: t.Optional(t.String()),
             password: t.Optional(t.String()),
             roles: t.Optional(t.Array(t.String())),
+            biography: t.Optional(t.String()),
+            profile_picture: t.Optional(t.String()),
           }),
           detail: {
             tags: ["Users"],
@@ -304,6 +308,68 @@ export function setupUserRoutes() {
             responses: {
               "200": {
                 description: "User updated successfully",
+              },
+              "404": {
+                description: "User not found",
+              },
+            },
+          },
+        })
+      // Update the current user's profile (simplified for frontend)
+      .put("/update/me",
+        async ({ body, requireAuth, set }) => {
+          const claims = await requireAuth();
+          const currentUserId = parseInt(claims.sub);
+
+          // Check profile picture size if it's being updated
+          // Base64 strings are ~33% larger than the original binary
+          // 2MB file size limit: 2 * 1024 * 1024 * 1.33 ≈ 2,796,202 characters
+          const MAX_PROFILE_PICTURE_SIZE = 2.8 * 1024 * 1024;
+          if (body.profile_picture && body.profile_picture.length > MAX_PROFILE_PICTURE_SIZE) {
+            set.status = 413; // Payload Too Large
+            return error("Profile picture exceeds maximum size of 2MB", 413);
+          }
+
+          // Only allow updating certain fields for self-updates
+          const allowedFields: Partial<NewUser> = {};
+          if (body.pseudo !== undefined) allowedFields.pseudo = body.pseudo;
+          if (body.biography !== undefined) allowedFields.biography = body.biography;
+          if (body.profile_picture !== undefined) allowedFields.profile_picture = body.profile_picture;
+          if (body.password !== undefined) allowedFields.password = body.password;
+
+          // Update the user with isAdmin=false since this is a self-update
+          const updatedUser = await userService.updateUser(
+            currentUserId,
+            allowedFields,
+            false
+          );
+
+          // Remove sensitive data from response
+          const { password_hash, ...userData } = updatedUser;
+
+          // Get user's roles
+          const { roleService } = await import("../services/role");
+          const userRoles = await roleService.getUserRoleNames(currentUserId);
+
+          return success({ ...userData, roles: userRoles });
+        },
+        {
+          body: t.Object({
+            pseudo: t.Optional(t.String()),
+            password: t.Optional(t.String()),
+            biography: t.Optional(t.String()),
+            profile_picture: t.Optional(t.String()),
+          }),
+          detail: {
+            tags: ["Users"],
+            summary: "Update current user's profile",
+            description: "Update the current user's profile information (simplified route for frontend)",
+            responses: {
+              "200": {
+                description: "Profile updated successfully",
+              },
+              "401": {
+                description: "Authentication required",
               },
               "404": {
                 description: "User not found",

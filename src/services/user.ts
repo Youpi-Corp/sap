@@ -11,6 +11,8 @@ export interface User {
   pseudo: string | null;
   email: string | null;
   password_hash: string | null;
+  biography: string | null;
+  profile_picture: string | null;
 }
 
 export interface NewUser {
@@ -18,6 +20,8 @@ export interface NewUser {
   email?: string | null;
   password?: string | null;
   roles?: string[]; // Array of role names instead of a single role
+  biography?: string | null;
+  profile_picture?: string | null;
 }
 
 export interface LoginRequest {

@@ -57,6 +57,13 @@
       "when": 1748205477200,
       "tag": "0007_married_thor_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1748528927776,
+      "tag": "0008_volatile_wind_dancer",
+      "breakpoints": true
     }
   ]
 }
