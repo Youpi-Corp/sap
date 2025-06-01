@@ -1,6 +1,6 @@
 import { db } from "../db/client";
-import { courses, modules } from "../db/schema";
-import { eq, or, count } from "drizzle-orm";
+import { courseLikes, courses, modules } from "../db/schema";
+import { eq, or, count, and } from "drizzle-orm";
 import { NotFoundError } from "../middleware/error";
 
 // Course types
@@ -22,6 +22,7 @@ export interface NewCourse {
   content: string;
   module_id: number;
   level: number;
+  // likes?: number;
   public: boolean;
   owner_id: number; // Changed user_id to owner_id
 }
@@ -227,6 +228,86 @@ export class CourseService {
       await this.updateModuleCoursesCount(moduleId);
     }
 
+    return result.length > 0;
+  }
+
+  /**
+   * User likes a course
+   * @param courseId Course ID
+   * @param userId User ID
+   * @return True if like was added
+   */
+  async likeCourse(courseId: number, userId: number): Promise<boolean> {
+    // Check if course exists
+    await this.getCourseById(courseId);
+
+    try {
+      const result = await db
+        .insert(courseLikes)
+        .values({ course_id: courseId, user_id: userId })
+        .returning();
+      return result.length > 0;
+    } catch (error) {
+      // If the error is due to a unique constraint violation, it means the user already liked the course
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * User unlikes a course
+   * @param courseId Course ID
+   * @param userId User ID
+   * @return True if unlike was successful
+   */
+  async unlikeCourse(courseId: number, userId: number): Promise<boolean> {
+    // Check if course exists
+    await this.getCourseById(courseId);
+
+    const result = await db
+      .delete(courseLikes)
+      .where(
+        and(
+          eq(courseLikes.course_id, courseId),
+          eq(courseLikes.user_id, userId)
+        )
+      )
+      .returning();
+    return result.length > 0;
+  }
+
+  /**
+   * Get the number of likes for a course
+   * @param courseId Course ID
+   * @returns Number of likes
+   */
+  async getCourseLikesCount(courseId: number): Promise<number> {
+    const result = await db
+      .select({ value: count() })
+      .from(courseLikes)
+      .where(eq(courseLikes.course_id, courseId));
+
+    return result[0]?.value || 0;
+  }
+
+  /**
+   * Check if a user has liked a course
+   * @param userId User ID
+   * @param courseId Course ID
+   * @return True if the user has liked the course
+   */
+  async hasUserLikedCourse(userId: number, courseId: number): Promise<boolean> {
+    const result = await db
+      .select()
+      .from(courseLikes)
+      .where(
+        and(
+          eq(courseLikes.user_id, userId),
+          eq(courseLikes.course_id, courseId)
+        )
+      );
     return result.length > 0;
   }
 }
