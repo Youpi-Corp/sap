@@ -128,6 +128,7 @@ export function setupCourseRoutes() {
           content: t.String(),
           module_id: t.Number(),
           level: t.Number(),
+          // likes: t.Optional(t.Number()),
           public: t.Boolean(),
         }), detail: {
           tags: ["Courses"],
@@ -220,6 +221,7 @@ export function setupCourseRoutes() {
           content: t.Optional(t.String()),
           module_id: t.Optional(t.Number()),
           level: t.Optional(t.Number()),
+          likes: t.Optional(t.Number()),
           public: t.Optional(t.Boolean()),
         }),
         detail: {
@@ -287,5 +289,131 @@ export function setupCourseRoutes() {
         },
       },
     }
-    );
+    )    // Check if a user has liked a course
+    .get(
+      "/has-liked/:courseId",
+      async ({ params, requireAuth }) => {
+        // Get user from JWT token
+        const claims = await requireAuth();
+        const userId = parseInt(claims.sub);
+
+        const courseId = parseInt(params.courseId, 10);
+        const hasLiked = await courseService.hasUserLikedCourse(userId, courseId);
+
+        return success({ hasLiked });
+      }, {
+        detail: {
+          tags: ["Courses"],
+          summary: "Check if course is liked by user",
+          description: "Check if the authenticated user has liked a specific course.",
+          responses: {
+            "200": {
+              description: "Liked status retrieved successfully",
+            },
+            "401": {
+              description: "Authentication required",
+            },
+            "404": {
+              description: "Course not found",
+            },
+          },
+        },
+      }
+    )
+    // Like a course
+    .post(
+      "/like/:courseId",
+      async ({ params, requireAuth, set }) => {
+        // Get user from JWT token
+        const claims = await requireAuth();
+        const userId = parseInt(claims.sub);
+
+        const courseId = parseInt(params.courseId, 10);
+        const liked = await courseService.likeCourse(courseId, userId);
+        return success({ liked });
+      }, {
+        detail: {
+          tags: ["Courses"],
+          summary: "Like a course",
+          description: "Like a specific course. User must be authenticated.",
+          responses: {
+            "200": {
+              description: "Course liked successfully",
+            },
+            "401": {
+              description: "Authentication required",
+            },
+            "404": {
+              description: "Course not found",
+            },
+            "400": {
+              description: "Bad request - Course already liked or other error",
+            },
+          },
+        },
+      }
+    )
+    // Unlike a course
+    .delete(
+      "/unlike/:courseId",
+      async ({ params, requireAuth, set }) => {
+        // Get user from JWT token
+        const claims = await requireAuth();
+        const userId = parseInt(claims.sub);
+
+        const courseId = parseInt(params.courseId, 10);
+        const unliked = await courseService.unlikeCourse(courseId, userId);
+        return success({ unliked });
+      }, {
+        detail: {
+          tags: ["Courses"],
+          summary: "Unlike a course",
+          description: "Unlike a specific course. User must be authenticated.",
+          responses: {
+            "200": {
+              description: "Course unliked successfully",
+            },
+            "401": {
+              description: "Authentication required",
+            },
+            "404": {
+              description: "Course not found",
+            },
+            "400": {
+              description: "Bad request - Course not liked or other error",
+            },
+          },
+        },
+      }
+    )
+    // Get the number of likes for a course
+    .get(
+      "/likes-count/:courseId",
+      async ({ params, requireAuth }) => {
+        // Get user from JWT token
+        await requireAuth(); // Ensure user is authenticated
+
+        const courseId = parseInt(params.courseId, 10);
+        const likesCount = await courseService.getCourseLikesCount(courseId);
+        return success({ likesCount });
+      }, {
+        detail: {
+          tags: ["Courses"],
+          summary: "Get course likes count",
+          description: "Retrieve the number of likes for a specific course.",
+          responses: {
+            "200": {
+              description: "Likes count retrieved successfully",
+            },
+            "401": {
+              description: "Authentication required",
+            },
+            "404": {
+              description: "Course not found",
+            },
+          },
+        },
+      }
+    )
+    ;
 }
