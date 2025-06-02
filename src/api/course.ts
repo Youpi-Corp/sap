@@ -323,13 +323,13 @@ export function setupCourseRoutes() {
     // Like a course
     .post(
       "/like/:courseId",
-      async ({ params, requireAuth, set }) => {
+      async ({ params, requireAuth }) => {
         // Get user from JWT token
         const claims = await requireAuth();
         const userId = parseInt(claims.sub);
 
         const courseId = parseInt(params.courseId, 10);
-        const liked = await courseService.likeCourse(courseId, userId);
+        const liked = await courseService.likeCourse(userId, courseId);
         return success({ liked });
       }, {
         detail: {
@@ -362,7 +362,7 @@ export function setupCourseRoutes() {
         const userId = parseInt(claims.sub);
 
         const courseId = parseInt(params.courseId, 10);
-        const unliked = await courseService.unlikeCourse(courseId, userId);
+        const unliked = await courseService.unlikeCourse(userId, courseId);
         return success({ unliked });
       }, {
         detail: {

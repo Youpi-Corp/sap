@@ -1,5 +1,5 @@
 import { db } from "../db/client";
-import { courseLikes, courses, modules } from "../db/schema";
+import { courses, modules, courseLikes } from "../db/schema";
 import { eq, or, count, and } from "drizzle-orm";
 import { NotFoundError } from "../middleware/error";
 
@@ -233,21 +233,21 @@ export class CourseService {
 
   /**
    * User likes a course
-   * @param courseId Course ID
    * @param userId User ID
+   * @param courseId Course ID
    * @return True if like was added
    */
-  async likeCourse(courseId: number, userId: number): Promise<boolean> {
+  async likeCourse(userId: number, courseId: number): Promise<boolean> {
     // Check if course exists
     await this.getCourseById(courseId);
 
     try {
       const result = await db
         .insert(courseLikes)
-        .values({ course_id: courseId, user_id: userId })
+        .values({ user_id: userId, course_id: courseId })
         .returning();
       return result.length > 0;
-    } catch (error) {
+    } catch (error: unknown) {
       // If the error is due to a unique constraint violation, it means the user already liked the course
       if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
         return false;
@@ -258,11 +258,11 @@ export class CourseService {
 
   /**
    * User unlikes a course
-   * @param courseId Course ID
    * @param userId User ID
+   * @param courseId Course ID
    * @return True if unlike was successful
    */
-  async unlikeCourse(courseId: number, userId: number): Promise<boolean> {
+  async unlikeCourse(userId: number, courseId: number): Promise<boolean> {
     // Check if course exists
     await this.getCourseById(courseId);
 
@@ -270,8 +270,8 @@ export class CourseService {
       .delete(courseLikes)
       .where(
         and(
-          eq(courseLikes.course_id, courseId),
-          eq(courseLikes.user_id, userId)
+          eq(courseLikes.user_id, userId),
+          eq(courseLikes.course_id, courseId)
         )
       )
       .returning();
