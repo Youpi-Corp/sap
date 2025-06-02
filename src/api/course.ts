@@ -356,7 +356,7 @@ export function setupCourseRoutes() {
     // Unlike a course
     .delete(
       "/unlike/:courseId",
-      async ({ params, requireAuth, set }) => {
+      async ({ params, requireAuth }) => {
         // Get user from JWT token
         const claims = await requireAuth();
         const userId = parseInt(claims.sub);
