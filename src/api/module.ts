@@ -4,6 +4,7 @@ import { success, error } from "../utils/response";
 import { setupAuth } from "../middleware/auth";
 import { ROLES } from "../utils/roles";
 import { NotFoundError } from "../middleware/error";
+import { courseService } from "../services/course";
 
 /**
  * Setup module routes
@@ -483,20 +484,35 @@ export function setupModuleRoutes() {
             return error("You are not authorized to delete this module", 403);
           }
 
+          // Get all courses in the module and delete them first
+          const moduleCourses = await moduleService.getModuleCourses(moduleId);
+          
+          // Delete each course with its associated likes using our course service
+          for (const course of moduleCourses) {
+            await courseService.deleteCourseAndUpdateModule(course.id);
+          }
+
+          // Unsubscribe all users from this module
+          await moduleService.unsubscribeAllUsersFromModule(moduleId);
+
+          // Now delete the module (courses_count will already be 0)
           await moduleService.deleteModule(moduleId);
-          return success({ message: "Module deleted" });
+          return success({ message: "Module and all its courses deleted successfully" });
         },
         {
           detail: {
             tags: ["Modules"],
             summary: "Delete a module",
-            description: "Delete a module by its ID",
+            description: "Delete a module by its ID along with all its associated courses and course likes",
             responses: {
               "200": {
-                description: "Module deleted successfully",
+                description: "Module and courses deleted successfully",
               },
               "401": {
                 description: "Authentication required",
+              },
+              "403": {
+                description: "Not authorized to delete this module",
               },
               "404": {
                 description: "Module not found",

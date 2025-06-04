@@ -390,6 +390,18 @@ export class ModuleService {  /**
       public: module.public === null ? false : Boolean(module.public)
     } as Module;
   }
+  /**
+   * Unsubscribe all users from a module (bulk operation)
+   * @param moduleId Module ID
+   * @returns Number of users unsubscribed
+   */
+  async unsubscribeAllUsersFromModule(moduleId: number): Promise<number> {
+    const result = await db
+      .delete(moduleSubscriptions)
+      .where(eq(moduleSubscriptions.module_id, moduleId))
+      .returning();
+    return result.length;
+  }
 }
 
 // Export a singleton instance
