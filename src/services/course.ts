@@ -220,6 +220,9 @@ export class CourseService {
     const currentCourse = await this.getCourseById(id);
     const moduleId = currentCourse.module_id;
 
+    // Delete course likes associated with this course
+    await db.delete(courseLikes).where(eq(courseLikes.course_id, id));
+
     // Delete the course
     const result = await db.delete(courses).where(eq(courses.id, id)).returning();
 
