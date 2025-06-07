@@ -115,3 +115,11 @@ export const courseLikes = pgTable("course_like", {
   course_id: integer("course_id").notNull().references(() => courses.id, { onDelete: "cascade" }),
   liked_at: text("liked_at").notNull().default("NOW()"),
 });
+
+// Course completion table
+export const courseCompletions = pgTable("course_completion", {
+  id: serial("id").primaryKey(),
+  user_id: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  course_id: integer("course_id").notNull().references(() => courses.id, { onDelete: "cascade" }),
+  completed_at: text("completed_at").notNull().default("NOW()"),
+});
