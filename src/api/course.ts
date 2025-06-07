@@ -445,5 +445,35 @@ export function setupCourseRoutes() {
         },
       }
     )
+    // Get info if the course is completed by user
+    .get(
+      "/is-completed/:courseId",
+      async ({ params, requireAuth }) => {
+        // Get user from JWT token
+        const claims = await requireAuth();
+        const userId = parseInt(claims.sub);
+
+        const courseId = parseInt(params.courseId, 10);
+        const isCompleted = await courseService.hasUserCompletedCourse(userId, courseId);
+        return success({ isCompleted });
+      }, {
+        detail: {
+          tags: ["Courses"],
+          summary: "Check if course is completed by user",
+          description: "Check if the authenticated user has completed a specific course.",
+          responses: {
+            "200": {
+              description: "Completion status retrieved successfully",
+            },
+            "401": {
+              description: "Authentication required",
+            },
+            "404": {
+              description: "Course not found",
+            },
+          },
+        },
+      }
+    )
     ;
 }
