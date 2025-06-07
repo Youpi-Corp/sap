@@ -338,6 +338,25 @@ export class CourseService {
       throw error;
     }
   }
+
+  /**
+   * Check if a user has completed a course
+   * @param userId User ID
+   * @param courseId Course ID
+   * @return True if the user has completed the course
+   */
+  async hasUserCompletedCourse(userId: number, courseId: number): Promise<boolean> {
+    const result = await db
+      .select()
+      .from(courseCompletions)
+      .where(
+        and(
+          eq(courseCompletions.user_id, userId),
+          eq(courseCompletions.course_id, courseId)
+        )
+      );
+    return result.length > 0;
+    }
 }
 
 // Export a singleton instance
