@@ -71,6 +71,13 @@
       "when": 1748783812562,
       "tag": "0009_dizzy_starhawk",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1749277532826,
+      "tag": "0010_nosy_silver_centurion",
+      "breakpoints": true
     }
   ]
 }

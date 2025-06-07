@@ -415,5 +415,35 @@ export function setupCourseRoutes() {
         },
       }
     )
+    // Mark course as completed by user
+    .post(
+      "/complete/:courseId",
+      async ({ params, requireAuth }) => {
+        // Get user from JWT token
+        const claims = await requireAuth();
+        const userId = parseInt(claims.sub);
+
+        const courseId = parseInt(params.courseId, 10);
+        const completed = await courseService.markCourseAsCompleted(userId, courseId);
+        return success({ completed });
+      }, {
+        detail: {
+          tags: ["Courses"],
+          summary: "Mark course as completed",
+          description: "Mark a specific course as completed by the authenticated user.",
+          responses: {
+            "200": {
+              description: "Course marked as completed successfully",
+            },
+            "401": {
+              description: "Authentication required",
+            },
+            "404": {
+              description: "Course not found",
+            },
+          },
+        },
+      }
+    )
     ;
 }

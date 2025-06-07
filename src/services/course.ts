@@ -1,5 +1,5 @@
 import { db } from "../db/client";
-import { courses, modules, courseLikes } from "../db/schema";
+import { courses, modules, courseLikes, courseCompletions } from "../db/schema";
 import { eq, or, count, and } from "drizzle-orm";
 import { NotFoundError } from "../middleware/error";
 
@@ -312,6 +312,31 @@ export class CourseService {
         )
       );
     return result.length > 0;
+  }
+
+  /**
+   * Mark lessons as completed for a user
+   * @param userId User ID
+   * @param courseId Course ID
+   * @return True if the course was marked as completed
+   */
+  async markCourseAsCompleted(userId: number, courseId: number): Promise<boolean> {
+    // Check if course exists
+    await this.getCourseById(courseId);
+
+    try {
+      const result = await db
+        .insert(courseCompletions)
+        .values({ user_id: userId, course_id: courseId, completed_at: new Date().toISOString() })
+        .returning();
+      return result.length > 0;
+    } catch (error: unknown) {
+      // If the error is due to a unique constraint violation, it means the user already completed the course
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+        return false;
+      }
+      throw error;
+    }
   }
 }
 
