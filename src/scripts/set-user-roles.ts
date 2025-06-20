@@ -1,6 +1,6 @@
 import { db } from "../db/client";
 import { users, userRoles } from "../db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { roleService } from "../services/role";
 import { ROLES, isValidRole } from "../utils/roles";
 
@@ -73,7 +73,7 @@ async function setUserRoles(userIdentifier: string, roleNames: string[]): Promis
             const role = await roleService.getRoleByName(roleName);
             roles.push(role);
             console.log(`✅ Role found: ${role.name} [ID: ${role.id}]`);
-        } catch (error) {
+        } catch {
             throw new Error(`Role not found in database: ${roleName}. Make sure to run 'bun run src/scripts/init-roles.ts' first.`);
         }
     }

@@ -92,7 +92,7 @@ async function addRolesToUser(userIdentifier: string, roleNames: string[]): Prom
                     skippedRoles.push(roleName);
                 }
             }
-        } catch (error) {
+        } catch {
             throw new Error(`Role not found in database: ${roleName}. Make sure to run 'bun run src/scripts/init-roles.ts' first.`);
         }
     }
@@ -155,7 +155,7 @@ async function removeRolesFromUser(userIdentifier: string, roleNames: string[]):
                     skippedRoles.push(roleName);
                 }
             }
-        } catch (error) {
+        } catch {
             throw new Error(`Role not found in database: ${roleName}. Make sure to run 'bun run src/scripts/init-roles.ts' first.`);
         }
     }
