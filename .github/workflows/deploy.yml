@@ -71,14 +71,12 @@ jobs:
             if ! command -v pm2 &> /dev/null; then
               npm install -g pm2
             fi
-            
-            # Create ecosystem file for proper environment handling (use .cjs for CommonJS)
+              # Create ecosystem file for proper environment handling (use .cjs for CommonJS)
             echo "module.exports = {" > ecosystem.config.cjs
             echo "  apps: [{" >> ecosystem.config.cjs
             echo "    name: '${{ env.APP_NAME }}'," >> ecosystem.config.cjs
             echo "    script: 'dist/index.js'," >> ecosystem.config.cjs
             echo "    interpreter: 'bun'," >> ecosystem.config.cjs
-            echo "    cwd: '${{ env.DEPLOY_PATH }}'," >> ecosystem.config.cjs
             echo "    env: {" >> ecosystem.config.cjs
             echo "      NODE_ENV: 'production'," >> ecosystem.config.cjs
             echo "      PORT: '${{ secrets.PORT }}'," >> ecosystem.config.cjs
