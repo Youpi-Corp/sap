@@ -302,23 +302,23 @@ export function setupCourseRoutes() {
 
         return success({ hasLiked });
       }, {
-        detail: {
-          tags: ["Courses"],
-          summary: "Check if course is liked by user",
-          description: "Check if the authenticated user has liked a specific course.",
-          responses: {
-            "200": {
-              description: "Liked status retrieved successfully",
-            },
-            "401": {
-              description: "Authentication required",
-            },
-            "404": {
-              description: "Course not found",
-            },
+      detail: {
+        tags: ["Courses"],
+        summary: "Check if course is liked by user",
+        description: "Check if the authenticated user has liked a specific course.",
+        responses: {
+          "200": {
+            description: "Liked status retrieved successfully",
+          },
+          "401": {
+            description: "Authentication required",
+          },
+          "404": {
+            description: "Course not found",
           },
         },
-      }
+      },
+    }
     )
     // Like a course
     .post(
@@ -332,26 +332,26 @@ export function setupCourseRoutes() {
         const liked = await courseService.likeCourse(userId, courseId);
         return success({ liked });
       }, {
-        detail: {
-          tags: ["Courses"],
-          summary: "Like a course",
-          description: "Like a specific course. User must be authenticated.",
-          responses: {
-            "200": {
-              description: "Course liked successfully",
-            },
-            "401": {
-              description: "Authentication required",
-            },
-            "404": {
-              description: "Course not found",
-            },
-            "400": {
-              description: "Bad request - Course already liked or other error",
-            },
+      detail: {
+        tags: ["Courses"],
+        summary: "Like a course",
+        description: "Like a specific course. User must be authenticated.",
+        responses: {
+          "200": {
+            description: "Course liked successfully",
+          },
+          "401": {
+            description: "Authentication required",
+          },
+          "404": {
+            description: "Course not found",
+          },
+          "400": {
+            description: "Bad request - Course already liked or other error",
           },
         },
-      }
+      },
+    }
     )
     // Unlike a course
     .delete(
@@ -365,26 +365,26 @@ export function setupCourseRoutes() {
         const unliked = await courseService.unlikeCourse(userId, courseId);
         return success({ unliked });
       }, {
-        detail: {
-          tags: ["Courses"],
-          summary: "Unlike a course",
-          description: "Unlike a specific course. User must be authenticated.",
-          responses: {
-            "200": {
-              description: "Course unliked successfully",
-            },
-            "401": {
-              description: "Authentication required",
-            },
-            "404": {
-              description: "Course not found",
-            },
-            "400": {
-              description: "Bad request - Course not liked or other error",
-            },
+      detail: {
+        tags: ["Courses"],
+        summary: "Unlike a course",
+        description: "Unlike a specific course. User must be authenticated.",
+        responses: {
+          "200": {
+            description: "Course unliked successfully",
+          },
+          "401": {
+            description: "Authentication required",
+          },
+          "404": {
+            description: "Course not found",
+          },
+          "400": {
+            description: "Bad request - Course not liked or other error",
           },
         },
-      }
+      },
+    }
     )
     // Get the number of likes for a course
     .get(
@@ -397,23 +397,23 @@ export function setupCourseRoutes() {
         const likesCount = await courseService.getCourseLikesCount(courseId);
         return success({ likesCount });
       }, {
-        detail: {
-          tags: ["Courses"],
-          summary: "Get course likes count",
-          description: "Retrieve the number of likes for a specific course.",
-          responses: {
-            "200": {
-              description: "Likes count retrieved successfully",
-            },
-            "401": {
-              description: "Authentication required",
-            },
-            "404": {
-              description: "Course not found",
-            },
+      detail: {
+        tags: ["Courses"],
+        summary: "Get course likes count",
+        description: "Retrieve the number of likes for a specific course.",
+        responses: {
+          "200": {
+            description: "Likes count retrieved successfully",
+          },
+          "401": {
+            description: "Authentication required",
+          },
+          "404": {
+            description: "Course not found",
           },
         },
-      }
+      },
+    }
     )
     // Mark course as completed by user
     .post(
@@ -427,23 +427,23 @@ export function setupCourseRoutes() {
         const completed = await courseService.markCourseAsCompleted(userId, courseId);
         return success({ completed });
       }, {
-        detail: {
-          tags: ["Courses"],
-          summary: "Mark course as completed",
-          description: "Mark a specific course as completed by the authenticated user.",
-          responses: {
-            "200": {
-              description: "Course marked as completed successfully",
-            },
-            "401": {
-              description: "Authentication required",
-            },
-            "404": {
-              description: "Course not found",
-            },
+      detail: {
+        tags: ["Courses"],
+        summary: "Mark course as completed",
+        description: "Mark a specific course as completed by the authenticated user.",
+        responses: {
+          "200": {
+            description: "Course marked as completed successfully",
+          },
+          "401": {
+            description: "Authentication required",
+          },
+          "404": {
+            description: "Course not found",
           },
         },
-      }
+      },
+    }
     )
     // Get info if the course is completed by user
     .get(
@@ -457,23 +457,23 @@ export function setupCourseRoutes() {
         const isCompleted = await courseService.hasUserCompletedCourse(userId, courseId);
         return success({ isCompleted });
       }, {
-        detail: {
-          tags: ["Courses"],
-          summary: "Check if course is completed by user",
-          description: "Check if the authenticated user has completed a specific course.",
-          responses: {
-            "200": {
-              description: "Completion status retrieved successfully",
-            },
-            "401": {
-              description: "Authentication required",
-            },
-            "404": {
-              description: "Course not found",
-            },
+      detail: {
+        tags: ["Courses"],
+        summary: "Check if course is completed by user",
+        description: "Check if the authenticated user has completed a specific course.",
+        responses: {
+          "200": {
+            description: "Completion status retrieved successfully",
+          },
+          "401": {
+            description: "Authentication required",
+          },
+          "404": {
+            description: "Course not found",
           },
         },
-      }
+      },
+    }
     )
     ;
 }
