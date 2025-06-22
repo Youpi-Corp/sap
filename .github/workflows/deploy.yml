@@ -86,11 +86,7 @@ jobs:
 
             # Install production dependencies directly on the VM
             echo "Installing production dependencies..."
-            bun install --production --frozen-lockfile
-
-            # Run database migrations using the compiled script via npm script
-            echo "Running database migrations..."
-            bun run migrate # Use the new npm script
+            bun install --production --frozen-lockfile            # Note: Migrations are handled separately in GitHub Actions
 
             # Start or restart the application using PM2
             echo "Restarting application with PM2..."
@@ -100,13 +96,13 @@ jobs:
             # Add a small delay
             sleep 2
             /usr/local/bin/pm2 save # Save the process list
-            echo "Deployment complete. Application managed by PM2."
-          EOF
+            echo "Deployment complete. Application managed by PM2."          EOF
 
   migrate:
-    name: Migrate Database
+    name: Run Database Migrations
     needs: build
     runs-on: ubuntu-latest
+    environment: Production # Access to production secrets
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -114,17 +110,15 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v1
         with:
-          bun-version: latest # Or lock to a specific version
+          bun-version: latest
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Install Drizzle Kit
-        run: bun install drizzle-kit
-
       - name: Run database migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          echo "Generating migrations..."
+          echo "Generating and applying migrations with Drizzle Kit..."
           bun run drizzle-kit generate
-          echo "Running migrations..."
           bun run drizzle-kit migrate
