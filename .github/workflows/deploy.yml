@@ -39,9 +39,7 @@ jobs:
       - name: Deploy to server
         run: |
           # Create deployment directory
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ${{ env.DEPLOY_PATH }}"
-
-          # Sync files (exclude unnecessary files)
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ${{ env.DEPLOY_PATH }}"          # Sync files (exclude unnecessary files)
           rsync -avz --delete \
             --exclude='.git' \
             --exclude='node_modules' \
@@ -69,11 +67,32 @@ jobs:
             bun install --production --frozen-lockfile
             
             # Run migrations
-            bun run migrate
+            bun run migrate            # Install PM2 if not already installed
+            if ! command -v pm2 &> /dev/null; then
+              npm install -g pm2
+            fi
+            
+            # Find Bun installation path
+            BUN_PATH=""
+            if [ -f "$HOME/.bun/bin/bun" ]; then
+              BUN_PATH="$HOME/.bun/bin/bun"
+            elif command -v bun &> /dev/null; then
+              BUN_PATH=$(which bun)
+            else
+              echo "❌ Bun not found on server"
+              exit 1
+            fi
+            
+            echo "Using Bun at: $BUN_PATH"
             
             # Restart PM2 process
             pm2 delete ${{ env.APP_NAME }} 2>/dev/null || true
-            pm2 start dist/index.js --name ${{ env.APP_NAME }} --interpreter bun
+            
+            # Start the application using Bun interpreter
+            pm2 start --interpreter "$BUN_PATH" \
+              --name ${{ env.APP_NAME }} \
+              dist/index.js
+            
             pm2 save
             
             # Health check
