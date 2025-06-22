@@ -21,6 +21,12 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Generate migrations (if schema changed)
+        run: |
+          if [ -f "src/db/schema.ts" ]; then
+            bun run db:generate
+          fi
+
       - name: Build project
         run: bun run build
 
@@ -33,6 +39,7 @@ jobs:
             package.json
             bun.lockb
             drizzle/       # Add the drizzle folder containing SQL migrations
+            drizzle.config.ts
             # Add any other files needed for production
   deploy:
     needs: build
@@ -60,9 +67,7 @@ jobs:
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ${{ secrets.DEPLOY_PATH }}"
 
           echo "Syncing full source code to VM..."
-          rsync -avz --delete --exclude node_modules --exclude .git ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
-
-          echo "Running deployment commands on VM..."
+          rsync -avz --delete --exclude node_modules --exclude .git ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/          echo "Running deployment commands on VM..."
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << EOF
             cd ${{ secrets.DEPLOY_PATH }} || exit 1
 
@@ -72,22 +77,14 @@ jobs:
             export DATABASE_URL="${DATABASE_URL}"
             export JWT_SECRET="${JWT_SECRET}"
 
-            # Install all dependencies (including dev dependencies for drizzle-kit)
-            echo "Installing dependencies..."
-            bun install --frozen-lockfile
-
-            # Run migrations with Drizzle Kit
-            echo "Running database migrations with Drizzle Kit..."
-            bun run drizzle-kit generate
-            bun run drizzle-kit migrate
-
-            # Build the application
-            echo "Building application..."
-            bun run build
-
             # Install production dependencies only
             echo "Installing production dependencies..."
-            bun install --production --frozen-lockfile
+            bun install --production --frozen-lockfile            # Run database migrations using drizzle-kit
+            echo "Validating migration environment..."
+            bun run db:validate
+            
+            echo "Running database migrations..."
+            bun run db:migrate
 
             # Start or restart the application using PM2
             echo "Restarting application with PM2..."
