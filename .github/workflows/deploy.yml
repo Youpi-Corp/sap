@@ -1,133 +1,88 @@
-# filepath: d:\Github\Brainforest\sap\.github\workflows\deploy.yml
-name: Deploy Backend to VM
+name: Deploy to Production
 
 on:
   push:
-    branches:
-      - main # Or your deployment branch
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  APP_NAME: brainforest-api
+  DEPLOY_PATH: /opt/brainforest-api
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
+    environment: production
+
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Bun
+      - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
-          bun-version: latest # Or lock to a specific version
+          bun-version: latest
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Generate migrations (if schema changed)
+      - name: Install dependencies and build
         run: |
-          if [ -f "src/db/schema.ts" ]; then
-            bun run db:generate
-          fi
+          bun install --frozen-lockfile
+          bun run build
 
-      - name: Build project
-        run: bun run build
-
-      - name: Archive production artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts
-          path: |
-            dist/
-            package.json
-            bun.lockb
-            drizzle/       # Add the drizzle folder containing SQL migrations
-            drizzle.config.ts
-            # Add any other files needed for production
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment: Production
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up SSH
+      - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Add known hosts
+      - name: Add server to known hosts
         run: ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy to VM and run migrations
+      - name: Deploy to server
+        run: |
+          # Create deployment directory
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ${{ env.DEPLOY_PATH }}"
+
+          # Sync files (exclude unnecessary files)
+          rsync -avz --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.env*' \
+            --exclude='*.log' \
+            ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ env.DEPLOY_PATH }}/
+
+      - name: Install and restart application
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           PORT: ${{ secrets.PORT }}
         run: |
-          echo "Ensuring deployment directory exists on VM..."
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ${{ secrets.DEPLOY_PATH }}"          echo "Syncing full source code to VM..."
-          rsync -avz --delete --exclude node_modules --exclude .git ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
-
-          echo "Running deployment commands on VM..."
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << EOF
-            cd ${{ secrets.DEPLOY_PATH }} || exit 1
-
-            # Export environment variables
-            export NODE_ENV="production"
-            export PORT="${PORT:-8080}"
-            export DATABASE_URL="${DATABASE_URL}"
-            export JWT_SECRET="${JWT_SECRET}"            # Install all dependencies for building (including dev dependencies)
-            echo "Installing dependencies for build..."
-            bun install --frozen-lockfile            # Build the application on the VM
-            echo "Building application..."
-            if ! bun run build; then
-              echo "❌ Build failed, attempting alternative build method..."
-              # Fallback: manual build steps
-              echo "Cleaning dist directory..."
-              rm -rf dist || true
-              echo "Creating dist directory..."
-              mkdir -p dist
-              echo "Compiling application..."
-              bun build ./src/index.ts --outdir ./dist --target bun
-              echo "Copying drizzle files..."
-              mkdir -p dist/drizzle && cp -r drizzle/* dist/drizzle/ || echo "Warning: Could not copy drizzle files"
-            fi
-
-            # Clean up dev dependencies after build
-            echo "Removing dev dependencies..."
-            bun install --production --frozen-lockfile
-
-            # Verify the build was successful
-            if [ ! -f "dist/index.js" ]; then
-              echo "❌ Build failed - dist/index.js not found"
-              exit 1
-            fi
-
-            # Run database migrations using drizzle-kit
-            echo "Validating migration environment..."
-            bun run db:validate
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            set -e
+            cd ${{ env.DEPLOY_PATH }}
             
-            echo "Running database migrations..."
-            bun run db:migrate
-
-            # Stop existing PM2 process
-            echo "Stopping existing PM2 process..."
-            /usr/local/bin/pm2 stop brainforest-api || true
-            /usr/local/bin/pm2 delete brainforest-api || true
-
-            # Start the application using PM2 with bun
-            echo "Starting application with PM2..."
-            /usr/local/bin/pm2 start dist/index.js --name brainforest-api --interpreter bun
-
-            # Wait and check if it started successfully
-            sleep 5
-            if /usr/local/bin/pm2 list | grep -q "brainforest-api.*online"; then
-              echo "✅ Application started successfully"
-              /usr/local/bin/pm2 save
+            # Set environment variables
+            export NODE_ENV=production
+            export DATABASE_URL="${{ env.DATABASE_URL }}"
+            export JWT_SECRET="${{ env.JWT_SECRET }}"
+            export PORT="${{ env.PORT }}"
+            
+            # Install production dependencies
+            bun install --production --frozen-lockfile
+            
+            # Run migrations
+            bun run migrate
+            
+            # Restart PM2 process
+            pm2 delete ${{ env.APP_NAME }} 2>/dev/null || true
+            pm2 start dist/index.js --name ${{ env.APP_NAME }} --interpreter bun
+            pm2 save
+            
+            # Health check
+            sleep 3
+            if pm2 list | grep -q "${{ env.APP_NAME }}.*online"; then
+              echo "✅ Deployment successful"
             else
-              echo "❌ Application failed to start"
-              /usr/local/bin/pm2 logs brainforest-api --lines 20
+              echo "❌ Deployment failed"
+              pm2 logs ${{ env.APP_NAME }} --lines 10
               exit 1
             fi
-
-            echo "Deployment complete. Application managed by PM2."
           EOF
