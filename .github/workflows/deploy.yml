@@ -7,7 +7,7 @@ on:
 
 env:
   APP_NAME: brainforest-api
-  DEPLOY_PATH: /opt/brainforest-api
+  DEPLOY_PATH: ~/brainforest-api
 
 jobs:
   deploy:
