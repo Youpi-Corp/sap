@@ -10,6 +10,10 @@ import { success, error } from "./utils/response";
 console.log("Starting server...");
 console.log("Environment:", process.env.NODE_ENV || "development");
 console.log("Port:", process.env.PORT || "8080");
+console.log("CORS Origins:", process.env.NODE_ENV === "production"
+  ? ["https://brain-forest.works", "https://www.brain-forest.works"]
+  : "all origins (development)"
+);
 
 // Get port from environment variable
 const port = parseInt(process.env.PORT || "8080");
@@ -34,15 +38,45 @@ const app = new Elysia()
           { name: "Courses", description: "Course management endpoints" },
         ],
       },
-    })
-  )
-  // Puis ajoutez les autres middlewares
+    }))  // Puis ajoutez les autres middlewares
   .use(setupErrorHandler())
-  .use(cookie()).use(
+  .use(cookie())
+  .use(
     cors({
-      origin: process.env.NODE_ENV === "production"
-        ? ["https://brain-forest.works", "https://www.brain-forest.works"]
-        : true, // Allow all origins in development
+      origin: (request) => {
+        const origin = request.headers.get('origin');
+        console.log(`CORS: Checking origin: ${origin || 'none'}`);
+        console.log(`CORS: Environment: ${process.env.NODE_ENV || 'undefined'}`);
+
+        // Always allow these production origins regardless of NODE_ENV
+        const productionOrigins = [
+          "https://brain-forest.works",
+          "https://www.brain-forest.works"
+        ];
+
+        // If no origin (direct requests), allow
+        if (!origin) {
+          console.log('CORS: No origin header, allowing request');
+          return true;
+        }
+
+        // Check if it's a production origin
+        if (productionOrigins.includes(origin)) {
+          console.log(`CORS: Production origin allowed: ${origin}`);
+          return true;
+        }
+
+        // In development or for localhost, allow all
+        if (process.env.NODE_ENV !== "production" ||
+          origin.includes('localhost') ||
+          origin.includes('127.0.0.1')) {
+          console.log(`CORS: Development/localhost origin allowed: ${origin}`);
+          return true;
+        }
+
+        console.log(`CORS: Origin blocked: ${origin}`);
+        return false;
+      },
       credentials: true,
       allowedHeaders: [
         "Content-Type",
@@ -50,10 +84,13 @@ const app = new Elysia()
         "X-Requested-With",
         "Accept",
         "Cookie",
-        "Set-Cookie"
+        "Set-Cookie",
+        "Cache-Control",
+        "Pragma"
       ],
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-      maxAge: 3600,
+      maxAge: 86400, // 24 hours
+      preflight: true
     })
   )// Add request logging middleware
   .onRequest(({ request }) => {
@@ -61,17 +98,28 @@ const app = new Elysia()
     const method = request.method;
     const url = request.url;
     const origin = request.headers.get('origin');
-    console.log(`[${timestamp}] ${method} ${url} from origin: ${origin || 'none'}`);
+    const userAgent = request.headers.get('user-agent');
+    console.log(`[${timestamp}] ${method} ${url}`);
+    console.log(`  Origin: ${origin || 'none'}`);
+    console.log(`  User-Agent: ${userAgent || 'none'}`);
 
     // Log preflight requests specifically
     if (method === 'OPTIONS') {
       console.log(`[PREFLIGHT] ${url} from ${origin || 'unknown origin'}`);
+      console.log('  Available CORS headers will be automatically handled by @elysiajs/cors');
     }
-  })
-  .use(setupRoutes)
-  .get("/health", () => {
+  }).use(setupRoutes).get("/health", () => {
     return success({
       status: "ok",
+      timestamp: new Date().toISOString(),
+    });
+  })
+  .get("/cors-test", ({ request }) => {
+    const origin = request.headers.get('origin');
+    return success({
+      message: "CORS test endpoint",
+      environment: process.env.NODE_ENV || "development",
+      origin: origin || "none",
       timestamp: new Date().toISOString(),
     });
   })
