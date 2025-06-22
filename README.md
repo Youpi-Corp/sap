@@ -23,8 +23,11 @@ This project provides a backend API for the Brainforest learning platform. It ha
   - Refresh tokens
   - Cookie management
 - **Role-based Access Control**:
-  - Support for multiple roles (Learner, Teacher, Designer, Admin)
-  - Authorization middleware
+  - Support for multiple roles (USER, ADMIN, TEACHER, CONTENT_CREATOR, MODERATOR)
+  - Permission-based access control
+  - Many-to-many relationship between users and roles
+  - Secure role assignment and verification
+  - Granular permission system for fine-tuned access control
 - **User Management**:
   - Create, read, update, and delete users
   - User profiles with customizable roles
@@ -40,21 +43,34 @@ This project provides a backend API for the Brainforest learning platform. It ha
 src/
 ├── api/             - API endpoint definitions
 │   ├── auth.ts      - Authentication routes
-│   ├── user.ts      - User routes
-│   └── info.ts      - Platform information
+│   ├── course.ts    - Course routes
+│   ├── index.ts     - API index, combines all route modules
+│   ├── info.ts      - Platform information routes
+│   ├── module.ts    - Module routes
+│   ├── role.ts      - Role management routes
+│   └── user.ts      - User routes
 ├── db/              - Database configuration
 │   ├── client.ts    - DB client
 │   ├── migrate.ts   - Migration utility
+│   ├── migrate-roles.ts - Script for migrating to new role system
+│   ├── roles-migration.ts - Defines roles and permissions for migration
 │   └── schema.ts    - Database schema
 ├── middleware/      - Application middleware
 │   ├── auth.ts      - Authentication middleware
 │   └── error.ts     - Error handling
+├── scripts/         - Utility scripts
+│   ├── create-admin.ts - Script to create an admin user
+│   └── init-roles.ts   - Script to initialize roles and permissions
 ├── services/        - Business logic
-│   ├── user.ts      - User service
-│   └── info.ts      - Information service
+│   ├── course.ts    - Course service
+│   ├── info.ts      - Information service
+│   ├── module.ts    - Module service
+│   ├── role.ts      - Role service
+│   └── user.ts      - User service
 ├── utils/           - Utilities
 │   ├── password.ts  - Password management
-│   └── response.ts  - Response formatting
+│   ├── response.ts  - Response formatting
+│   └── roles.ts     - Role definitions and utilities
 └── index.ts         - Application entry point
 ```
 
@@ -109,7 +125,8 @@ src/
 
 The API is documented with Swagger and accessible at:
 
-- https://sap-m1i0.onrender.com/swagger
+- Local: http://localhost:8080/swagger (if `PORT` is set to 8080)
+- Production: https://sap-m1i0.onrender.com/swagger
 
 ## API Endpoints
 
@@ -131,37 +148,48 @@ The API is documented with Swagger and accessible at:
 - `PUT /user/update/:userId`: Update a user
 - `DELETE /user/delete/:userId`: Delete a user (Admin only)
 
+### Role Management
+
+- `GET /role/list`: List all roles (Admin only)
+- `POST /role/assign`: Assign a role to a user (Admin only)
+- `POST /role/remove`: Remove a role from a user (Admin only)
+
 ### Platform Information
 
 - `GET /info/get`: Retrieve general information
 - `PUT /info/update`: Update information (Admin only)
 - `GET /info/alive`: Service health check
 
-## Database Schema
+### Module Management
 
-The project uses several tables to manage an educational platform:
+- `GET /module/list`: List all modules
+- `GET /module/get/:moduleId`: Get a module by ID
+- `POST /module/create`: Create a new module (Requires CREATE_MODULE permission or ADMIN/TEACHER role)
+- `PUT /module/update/:moduleId`: Update a module (Owner or ADMIN/TEACHER role)
+- `DELETE /module/delete/:moduleId`: Delete a module (Owner or ADMIN/TEACHER role)
+- `GET /module/owner/:ownerId`: Get modules by owner ID
 
-- **user**: System users
-- **chat**: Conversations
-- **module**: Educational modules
-- **course**: Individual courses
-- **asset**: Course resources
-- **subscription**: User progress tracking
-- **info**: General platform information
-- **refresh_token**: Refresh token management
+### Course Management
 
-## Deployment
-
-The project is configured to be deployed on Render with the provided render.yaml file.
-
-## Development
-
-To contribute to the project:
-
-1. Clone the repository
-2. Install dependencies with `bun install`
-3. Configure your local environment
-4. Launch the application in development mode with `bun run dev`
+- `GET /course/list`: List courses based on user permissions
+  - Admins see all courses
+  - Regular users see only public courses and their own courses
+- `GET /course/get/:courseId`: Get course by ID
+  - Access granted if:
+    - Course is public, OR
+    - User owns the course, OR
+    - User has ADMIN role
+- `POST /course/create`: Create a new course
+  - Requires:
+    - CREATE_COURSE permission or TEACHER/ADMIN role
+    - User must own the module or be an admin
+- `PUT /course/update/:courseId`: Update a course
+  - Access granted if user owns the course or has ADMIN role
+- `DELETE /course/delete/:courseId`: Delete a course
+  - Access granted if user owns the course or has ADMIN role
+- `GET /course/owner/:ownerId`: Get courses by owner ID
+  - When requesting your own courses or as admin: all courses
+  - Otherwise: only public courses
 
 ## License
 

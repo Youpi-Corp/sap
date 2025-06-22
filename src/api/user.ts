@@ -1,79 +1,83 @@
 import { Elysia, t } from "elysia";
-import { userService } from "../services/user";
-import { setupAuth, Role } from "../middleware/auth";
-import { success, UNAUTHORIZED } from "../utils/response";
-import { ForbiddenError } from "../middleware/error";
+import { userService, type NewUser } from "../services/user"; // Import NewUser type
+import { success, error } from "../utils/response";
+import { setupAuth } from "../middleware/auth";
+import { ROLES } from "../utils/roles";
 
 /**
  * Setup user routes
  */
 export function setupUserRoutes() {
-  const authPlugin = setupAuth();
+  const auth = setupAuth();
 
   return (
     new Elysia({ prefix: "/user" })
-      .use(authPlugin)
+      .use(auth)
       // Get current user
       .get(
         "/me",
-        async ({ user, isAuthenticated, set }) => {
-          // Check authentication
-          if (!isAuthenticated() || !user) {
-            // Set the HTTP status code to match the response body status code
-            set.status = 401;
-            return UNAUTHORIZED;
-          }
+        async ({ requireAuth, set }) => {
+          try {
+            // Get user ID from JWT token
+            const claims = await requireAuth();
+            const userId = parseInt(claims.sub);            // Get user data
+            const user = await userService.getUserById(userId);
 
-          // Get user by email from JWT
-          const userData = await userService.getUserByEmail(user.sub);
-          return success(userData);
+            // Get user's roles
+            const { roleService } = await import("../services/role");
+            const userRoles = await roleService.getUserRoleNames(userId);
+
+            // Remove sensitive data
+            const { password_hash, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars
+
+            return success({ ...userData, roles: userRoles });
+          } catch (err) {
+            set.status = 401;
+            return error((err as Error).message || "Authentication required", 401);
+          }
         },
         {
           detail: {
             tags: ["Users"],
             summary: "Get current user profile",
-            description:
-              "Retrieve the profile of the currently authenticated user",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+            description: "Retrieve the profile of the currently authenticated user",
             responses: {
               "200": {
                 description: "User profile retrieved successfully",
               },
               "401": {
-                description: "Not authenticated",
-              },
+                description: "Authentication required",
+              }
             },
           },
         }
-      )
-      // Get user by ID
+      )      // Get user by ID
       .get(
         "/get/:userId",
-        async ({ params, guard, set }) => {
-          // Check authentication
-          const authResult = guard();
-          if (authResult) {
-            // If guard returned a response, it means auth failed
-            set.status = authResult.statusCode;
-            return authResult;
-          }
+        async ({ params, requireAuth }) => {          // Require authentication
+          await requireAuth();
+          const user = await userService.getUserById(parseInt(params.userId));
 
-          const userId = parseInt(params.userId, 10);
-          const user = await userService.getUserById(userId);
-          return success(user);
+          // Get user's roles
+          const { roleService } = await import("../services/role");
+          const userRoles = await roleService.getUserRoleNames(parseInt(params.userId));
+
+          // Remove sensitive data
+          const { password_hash, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars
+
+          return success({ ...userData, roles: userRoles });
         },
         {
           detail: {
             tags: ["Users"],
             summary: "Get user by ID",
             description: "Retrieve a user's profile by their ID",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
             responses: {
               "200": {
                 description: "User found",
               },
               "401": {
-                description: "Not authenticated",
+                description: "Authentication required",
               },
               "404": {
                 description: "User not found",
@@ -85,30 +89,30 @@ export function setupUserRoutes() {
       // Get user by email
       .get(
         "/get_by_email/:email",
-        async ({ params, guard, set }) => {
-          // Check authentication
-          const authResult = guard();
-          if (authResult) {
-            // If guard returned a response, it means auth failed
-            set.status = authResult.statusCode;
-            return authResult;
-          }
-
+        async ({ params, requireAuth }) => {          // Require authentication
+          await requireAuth();
           const user = await userService.getUserByEmail(params.email);
-          return success(user);
+
+          // Get user's roles
+          const { roleService } = await import("../services/role");
+          const userRoles = await roleService.getUserRoleNames(user.id);
+
+          // Remove sensitive data
+          const { password_hash, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars
+
+          return success({ ...userData, roles: userRoles });
         },
         {
           detail: {
             tags: ["Users"],
             summary: "Get user by email",
             description: "Retrieve a user's profile by their email address",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
             responses: {
               "200": {
                 description: "User found",
               },
               "401": {
-                description: "Not authenticated",
+                description: "Authentication required",
               },
               "404": {
                 description: "User not found",
@@ -146,44 +150,37 @@ export function setupUserRoutes() {
             },
           },
         }
-      )
-      // Create user (admin only)
+      )      // Create user (admin only)
       .post(
         "/create",
-        async ({ body, guardRoles, set }) => {
+        async ({ body, set, requireAuth, guardRoles }) => {
           // Check if user has admin role
-          const authResult = guardRoles([Role.Admin]);
+          const authResult = guardRoles([ROLES.ADMIN]);
           if (authResult) {
-            // If guard returned a response, it means auth failed
             set.status = authResult.statusCode;
             return authResult;
-          }
-
-          const user = await userService.createUser(body);
+          }          // Admin is creating the user, so pass isAdmin=true
+          await requireAuth();
+          const createdUser = await userService.createUser(body as NewUser, true);
           set.status = 201;
-          return success(user, 201);
+          return success(createdUser, 201);
         },
         {
           body: t.Object({
             pseudo: t.Optional(t.String()),
             email: t.String(),
             password: t.String(),
-            role: t.Optional(t.String()),
+            roles: t.Optional(t.Array(t.String())),
+            biography: t.Optional(t.String()),
+            profile_picture: t.Optional(t.String()),
           }),
           detail: {
             tags: ["Users"],
-            summary: "Create user (Admin only)",
-            description: "Create a new user (Admin role required)",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+            summary: "Create user",
+            description: "Create a new user",
             responses: {
               "201": {
                 description: "User created successfully",
-              },
-              "401": {
-                description: "Not authenticated",
-              },
-              "403": {
-                description: "Not authorized (Admin role required)",
               },
               "409": {
                 description: "Email already in use",
@@ -191,55 +188,66 @@ export function setupUserRoutes() {
             },
           },
         }
-      )
-      // List all users (admin only)
+      )      // List all users (admin only)
       .get(
         "/list",
-        async ({ guardRoles, set }) => {
+        async ({ requireAuth, guardRoles, set }) => {
           // Check if user has admin role
-          const authResult = guardRoles([Role.Admin]);
+          const authResult = guardRoles([ROLES.ADMIN]);
           if (authResult) {
-            // If guard returned a response, it means auth failed
             set.status = authResult.statusCode;
             return authResult;
-          }
-
+          }          // If we get here, the user is authenticated and has admin role
+          await requireAuth();
           const users = await userService.getAllUsers();
-          return success(users);
+
+          // Get roles for each user and remove sensitive data
+          const { roleService } = await import("../services/role");
+          const safeUsers = await Promise.all(users.map(async user => {
+            const { password_hash, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars
+
+            // Get user's roles
+            try {
+              const roles = await roleService.getUserRoleNames(user.id);
+              return { ...userData, roles };
+            } catch (err) {
+              console.error(`Error fetching roles for user ${user.id}:`, err);
+              return { ...userData, roles: [] };
+            }
+          }));
+
+          return success(safeUsers);
         },
         {
           detail: {
             tags: ["Users"],
-            summary: "List all users (Admin only)",
-            description:
-              "Get a list of all users in the system (Admin role required)",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+            summary: "List all users",
+            description: "Get a list of all users in the system (Admin only)",
             responses: {
               "200": {
                 description: "List of users retrieved successfully",
               },
               "401": {
-                description: "Not authenticated",
+                description: "Authentication required",
               },
               "403": {
-                description: "Not authorized (Admin role required)",
-              },
+                description: "Forbidden - Admin role required",
+              }
             },
           },
         }
-      )
-      // Delete user (admin only)
+      )      // Delete user (admin only)
       .delete(
         "/delete/:userId",
-        async ({ params, guardRoles, set }) => {
+        async ({ params, requireAuth, guardRoles, set }) => {
           // Check if user has admin role
-          const authResult = guardRoles([Role.Admin]);
+          const authResult = guardRoles([ROLES.ADMIN]);
           if (authResult) {
-            // If guard returned a response, it means auth failed
             set.status = authResult.statusCode;
             return authResult;
           }
 
+          await requireAuth();
           const userId = parseInt(params.userId, 10);
           await userService.deleteUser(userId);
           return success({ message: "User deleted" });
@@ -247,18 +255,11 @@ export function setupUserRoutes() {
         {
           detail: {
             tags: ["Users"],
-            summary: "Delete user (Admin only)",
-            description: "Delete a user by ID (Admin role required)",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+            summary: "Delete user",
+            description: "Delete a user by ID",
             responses: {
               "200": {
                 description: "User deleted successfully",
-              },
-              "401": {
-                description: "Not authenticated",
-              },
-              "403": {
-                description: "Not authorized (Admin role required)",
               },
               "404": {
                 description: "User not found",
@@ -266,27 +267,29 @@ export function setupUserRoutes() {
             },
           },
         }
-      )
-      // Update user
-      .put(
-        "/update/:userId",
-        async ({ params, body, user, isAuthenticated, hasRoles, set }) => {
-          // Check authentication
-          if (!isAuthenticated() || !user) {
-            set.status = 401;
-            return UNAUTHORIZED;
-          }
+      )      // Update user (with proper auth checks)
+      .put("/update/:userId",
+        async ({ params, body, requireAuth, set }) => {
+          const userIdToUpdate = parseInt(params.userId, 10);
+          const claims = await requireAuth();
+          const currentUserId = parseInt(claims.sub);
 
-          const userId = parseInt(params.userId, 10);
-          const userData = await userService.getUserById(userId);
+          // Determine if this is a self-update or if admin is updating someone else
+          const isSelfUpdate = currentUserId === userIdToUpdate;
+          const isAdmin = claims.roles.includes(ROLES.ADMIN);
 
-          // Check if user is updating their own profile or is an admin
-          if (userData.email !== user.sub && !hasRoles([Role.Admin])) {
+          // Only allow users to update themselves, unless they're an admin
+          if (!isSelfUpdate && !isAdmin) {
             set.status = 403;
-            throw new ForbiddenError("Cannot update other users");
+            return error("You can only update your own profile", 403);
           }
 
-          const updatedUser = await userService.updateUser(userId, body);
+          // Explicitly cast body to Partial<NewUser> after validation by Elysia's `t.Object`
+          const updatedUser = await userService.updateUser(
+            userIdToUpdate,
+            body as Partial<NewUser>,
+            isAdmin
+          );
           return success(updatedUser);
         },
         {
@@ -294,23 +297,79 @@ export function setupUserRoutes() {
             pseudo: t.Optional(t.String()),
             email: t.Optional(t.String()),
             password: t.Optional(t.String()),
-            role: t.Optional(t.String()),
+            roles: t.Optional(t.Array(t.String())),
+            biography: t.Optional(t.String()),
+            profile_picture: t.Optional(t.String()),
           }),
           detail: {
             tags: ["Users"],
             summary: "Update user",
-            description:
-              "Update a user's profile (Users can update their own profile, Admin can update any profile)",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+            description: "Update a user's profile",
             responses: {
               "200": {
                 description: "User updated successfully",
               },
-              "401": {
-                description: "Not authenticated",
+              "404": {
+                description: "User not found",
               },
-              "403": {
-                description: "Not authorized to update this user",
+            },
+          },
+        })
+      // Update the current user's profile (simplified for frontend)
+      .put("/update/me",
+        async ({ body, requireAuth, set }) => {
+          const claims = await requireAuth();
+          const currentUserId = parseInt(claims.sub);
+
+          // Check profile picture size if it's being updated
+          // Base64 strings are ~33% larger than the original binary
+          // 2MB file size limit: 2 * 1024 * 1024 * 1.33 ≈ 2,796,202 characters
+          const MAX_PROFILE_PICTURE_SIZE = 2.8 * 1024 * 1024;
+          if (body.profile_picture && body.profile_picture.length > MAX_PROFILE_PICTURE_SIZE) {
+            set.status = 413; // Payload Too Large
+            return error("Profile picture exceeds maximum size of 2MB", 413);
+          }
+
+          // Only allow updating certain fields for self-updates
+          const allowedFields: Partial<NewUser> = {};
+          if (body.pseudo !== undefined) allowedFields.pseudo = body.pseudo;
+          if (body.biography !== undefined) allowedFields.biography = body.biography;
+          if (body.profile_picture !== undefined) allowedFields.profile_picture = body.profile_picture;
+          if (body.password !== undefined) allowedFields.password = body.password;
+
+          // Update the user with isAdmin=false since this is a self-update
+          const updatedUser = await userService.updateUser(
+            currentUserId,
+            allowedFields,
+            false
+          );
+
+          // Remove sensitive data from response
+          const { password_hash, ...userData } = updatedUser;
+
+          // Get user's roles
+          const { roleService } = await import("../services/role");
+          const userRoles = await roleService.getUserRoleNames(currentUserId);
+
+          return success({ ...userData, roles: userRoles });
+        },
+        {
+          body: t.Object({
+            pseudo: t.Optional(t.String()),
+            password: t.Optional(t.String()),
+            biography: t.Optional(t.String()),
+            profile_picture: t.Optional(t.String()),
+          }),
+          detail: {
+            tags: ["Users"],
+            summary: "Update current user's profile",
+            description: "Update the current user's profile information (simplified route for frontend)",
+            responses: {
+              "200": {
+                description: "Profile updated successfully",
+              },
+              "401": {
+                description: "Authentication required",
               },
               "404": {
                 description: "User not found",

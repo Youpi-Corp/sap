@@ -1,6 +1,6 @@
 {
-  "id": "17eb9d90-596b-4188-b985-8932cb610d4f",
-  "prevId": "9b8eaaaf-3584-44d7-8733-f7b8c97c8cd8",
+  "id": "9b8eaaaf-3584-44d7-8733-f7b8c97c8cd8",
+  "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -526,7 +526,7 @@
         },
         "role": {
           "name": "role",
-          "type": "varchar(20)",
+          "type": "varchar(4)",
           "primaryKey": false,
           "notNull": false
         }

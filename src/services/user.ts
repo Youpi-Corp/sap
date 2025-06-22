@@ -3,6 +3,7 @@ import { users, refreshTokens } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { hashPassword, verifyPassword } from "../utils/password";
 import { NotFoundError, ApiError } from "../middleware/error";
+import { isValidRole, getDefaultRole } from "../utils/roles";
 
 // User types
 export interface User {
@@ -10,14 +11,17 @@ export interface User {
   pseudo: string | null;
   email: string | null;
   password_hash: string | null;
-  role: string | null;
+  biography: string | null;
+  profile_picture: string | null;
 }
 
 export interface NewUser {
   pseudo?: string | null;
   email?: string | null;
   password?: string | null;
-  role?: string | null;
+  roles?: string[]; // Array of role names instead of a single role
+  biography?: string | null;
+  profile_picture?: string | null;
 }
 
 export interface LoginRequest {
@@ -31,19 +35,12 @@ export interface TokenData {
   expiresIn: number;
 }
 
-export class UserService {
-  /**
+export class UserService {  /**
    * Create a new user
    * @param userData User data
+   * @param isAdmin Whether the creator is an admin (determines if role can be set)
    * @returns Created user
-   */
-  async createUser(userData: NewUser): Promise<User> {
-    // Ignore the roles because its a critical security flow, will fix it later
-    // if the userData.role is defined, replace it with 1000 (Learner role)
-    if (userData.role) {
-      userData.role = "1000"; // Default to Learner role
-    }
-
+   */  async createUser(userData: NewUser, isAdmin: boolean = false): Promise<User> {
     // Check if email already exists
     if (userData.email) {
       const existingUser = await db
@@ -54,22 +51,56 @@ export class UserService {
       if (existingUser.length > 0) {
         throw new ApiError("Email already in use", 409);
       }
-    }
-
-    // Hash password if provided
-    let userToInsert: any = { ...userData };
+    }    // Hash password if provided
+    const userToInsert: Partial<User & { password_hash?: string | null }> = { ...userData };
     if (userData.password) {
       userToInsert.password_hash = await hashPassword(userData.password);
-      delete userToInsert.password;
+      // Create a typed record before deleting a property
+      const userRecord = userToInsert as Partial<User & { password_hash?: string | null } & { password?: string }>;
+      delete userRecord.password;
     }
 
-    // Set default role if not provided
-    if (!userToInsert.role) {
-      userToInsert.role = "1000"; // Default to Learner role
-    }
+    // Remove roles from insert data (will be handled separately)
+    const userRoles = userData.roles || [];
+    // Create a typed record before deleting a property
+    const userRecordWithRoles = userToInsert as Partial<User & { password_hash?: string | null } & { roles?: string[] }>;
+    delete userRecordWithRoles.roles;
 
     // Insert user
     const result = await db.insert(users).values(userToInsert).returning();
+
+    // Assign roles to the new user in the user_roles table
+    const { roleService } = await import("./role");
+    try {
+      // Get the default USER role
+      const userRole = await roleService.getRoleByName(getDefaultRole());
+      await roleService.assignRoleToUser(result[0].id, userRole.id);
+
+      // If the user should have additional roles and the creator is an admin
+      if (isAdmin && userRoles.length > 0) {
+        for (const roleName of userRoles) {
+          // Skip if it's the default role (already assigned)
+          if (roleName === getDefaultRole()) continue;
+
+          // Validate the role
+          if (!isValidRole(roleName)) {
+            console.warn(`Invalid role specified: ${roleName}`);
+            continue;
+          }
+
+          try {
+            const role = await roleService.getRoleByName(roleName);
+            await roleService.assignRoleToUser(result[0].id, role.id);
+          } catch (err) {
+            // Log but don't fail if the additional role cannot be assigned
+            console.error(`Could not assign role ${roleName} to new user:`, err);
+          }
+        }
+      }
+    } catch (err) {
+      // Log role assignment error but don't fail user creation
+      console.error("Error assigning default role to new user:", err);
+    }
 
     return result[0];
   }
@@ -111,25 +142,30 @@ export class UserService {
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users);
   }
-
   /**
    * Update a user
    * @param id User ID
    * @param userData User data to update
+   * @param isAdmin Whether the updater is an admin (determines if role can be changed)
+   * @param currentUserId ID of the user performing the update
    * @returns Updated user
-   */
-  async updateUser(id: number, userData: NewUser): Promise<User> {
-    // Ignore the roles because its a critical security flow, will fix it later
-    // if the userData.role is defined, replace it with 1000 (Learner role)
-    if (userData.role) {
-      userData.role = "1000"; // Default to Learner role
-    }
+   */  async updateUser(
+    id: number,
+    userData: NewUser,
+    isAdmin: boolean = false,): Promise<User> {
+    // Extract roles to update separately if provided
+    const rolesToUpdate = userData.roles || [];
+    // Create a typed record before deleting a property
+    const userDataWithRoles = userData as NewUser & { roles?: string[] };
+    delete userDataWithRoles.roles;
 
     // Hash password if provided
-    let userToUpdate: any = { ...userData };
+    const userToUpdate: Partial<User & { password_hash?: string | null }> = { ...userData };
     if (userData.password) {
       userToUpdate.password_hash = await hashPassword(userData.password);
-      delete userToUpdate.password;
+      // Create a typed record before deleting a property
+      const userRecord = userToUpdate as Partial<User & { password_hash?: string | null } & { password?: string }>;
+      delete userRecord.password;
     }
 
     // Update user
@@ -139,10 +175,52 @@ export class UserService {
       .where(eq(users.id, id))
       .returning();
 
-    console.log(result);
-
     if (result.length === 0) {
       throw new NotFoundError("User not found");
+    }
+
+    // Update roles if admin and roles provided
+    if (isAdmin && rolesToUpdate.length > 0) {
+      const { roleService } = await import("./role");
+
+      try {
+        // Get current user roles
+        const currentRoles = await roleService.getUserRoles(id);
+        const currentRoleNames = currentRoles.map(r => r.name);
+
+        // Determine roles to add and roles to remove
+        const rolesToAdd = rolesToUpdate.filter(r => !currentRoleNames.includes(r));
+        const rolesToRemove = currentRoles.filter(r => !rolesToUpdate.includes(r.name) && r.name !== getDefaultRole());
+
+        // Add new roles
+        for (const roleName of rolesToAdd) {
+          if (!isValidRole(roleName)) {
+            console.warn(`Invalid role specified: ${roleName}, skipping assignment`);
+            continue;
+          }
+
+          try {
+            const role = await roleService.getRoleByName(roleName);
+            await roleService.assignRoleToUser(id, role.id);
+          } catch (err) {
+            console.error(`Could not assign role ${roleName} to user:`, err);
+          }
+        }
+
+        // Remove roles no longer needed
+        for (const role of rolesToRemove) {
+          // Never remove the default user role
+          if (role.name === getDefaultRole()) continue;
+
+          try {
+            await roleService.removeRoleFromUser(id, role.id);
+          } catch (err) {
+            console.error(`Could not remove role ${role.name} from user:`, err);
+          }
+        }
+      } catch (err) {
+        console.error("Error updating user roles:", err);
+      }
     }
 
     return result[0];

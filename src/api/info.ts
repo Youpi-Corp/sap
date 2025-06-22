@@ -1,27 +1,29 @@
 import { Elysia, t } from "elysia";
 import { infoService } from "../services/info";
-import { setupAuth, Role } from "../middleware/auth";
+import { setupAuth } from "../middleware/auth";
 import { success } from "../utils/response";
+import { ROLES } from "../utils/roles";
 
 /**
  * Setup info routes
  */
 export function setupInfoRoutes() {
-  const authPlugin = setupAuth();
+  const auth = setupAuth();
 
   return (
     new Elysia({ prefix: "/info" })
-      .use(authPlugin)
-      // Get info
+      .use(auth)
+      // Get info - publicly accessible
       .get(
         "/get",
         async ({ set }) => {
           try {
             const info = await infoService.getInfo();
             return success(info);
-          } catch (error) {
+          } catch (fetchError) {
             // If info not found, set correct status code
             set.status = 404;
+            console.error("Error fetching info:", fetchError);
             return success(null, 404);
           }
         },
@@ -41,8 +43,7 @@ export function setupInfoRoutes() {
             },
           },
         }
-      )
-      // Alive check
+      )      // Alive check - publicly accessible
       .get(
         "/alive",
         () => {
@@ -64,14 +65,16 @@ export function setupInfoRoutes() {
       // Update info (admin only)
       .put(
         "/update",
-        async ({ body, guardRoles, set }) => {
-          // Check if user has admin role
-          const authResult = guardRoles([Role.Admin]);
+        async ({ body, guardRoles, requireAuth, set }) => {          // Check if user has admin role
+          const authResult = guardRoles([ROLES.ADMIN]);
           if (authResult) {
             // If guard returned a response, it means auth failed
             set.status = authResult.statusCode;
             return authResult;
           }
+
+          // Verify authentication
+          await requireAuth();
 
           const updatedInfo = await infoService.updateInfo(body);
           return success(updatedInfo);
@@ -86,7 +89,7 @@ export function setupInfoRoutes() {
             summary: "Update platform information (Admin only)",
             description:
               "Update general platform information (Admin role required)",
-            security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+            security: [{ cookieAuth: [] }],
             responses: {
               "200": {
                 description: "Information updated successfully",

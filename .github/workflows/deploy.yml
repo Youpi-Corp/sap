@@ -102,3 +102,29 @@ jobs:
             /usr/local/bin/pm2 save # Save the process list
             echo "Deployment complete. Application managed by PM2."
           EOF
+
+  migrate:
+    name: Migrate Database
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest # Or lock to a specific version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Drizzle Kit
+        run: bun install drizzle-kit
+
+      - name: Run database migrations
+        run: |
+          echo "Generating migrations..."
+          bun run drizzle-kit generate
+          echo "Running migrations..."
+          bun run drizzle-kit migrate

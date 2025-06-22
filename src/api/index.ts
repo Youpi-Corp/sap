@@ -4,6 +4,7 @@ import { setupUserRoutes } from "./user";
 import { setupInfoRoutes } from "./info";
 import { setupModuleRoutes } from "./module";
 import { setupCourseRoutes } from "./course";
+import { setupRoleRoutes } from "./role";
 
 /**
  * Register all API routes
@@ -14,5 +15,6 @@ export function setupRoutes(app: Elysia) {
     .use(setupUserRoutes())
     .use(setupInfoRoutes())
     .use(setupModuleRoutes())
-    .use(setupCourseRoutes());
+    .use(setupCourseRoutes())
+    .use(setupRoleRoutes());
 }

@@ -1,26 +1,82 @@
 {
-  "version": "5",
-  "dialect": "pg",
+  "version": "7",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "5",
-      "when": 1715536200000,
-      "tag": "0000_initial_schema",
+      "version": "7",
+      "when": 1747998244682,
+      "tag": "0000_majestic_darwin",
       "breakpoints": true
     },
     {
       "idx": 1,
-      "version": "5",
-      "when": 1742655967976,
-      "tag": "0001_flowery_lucky_pierre",
+      "version": "7",
+      "when": 1748001190453,
+      "tag": "0001_mature_nehzno",
       "breakpoints": true
     },
     {
       "idx": 2,
-      "version": "5",
-      "when": 1742658083793,
-      "tag": "0002_short_shotgun",
+      "version": "7",
+      "when": 1748002939834,
+      "tag": "0002_good_meteorite",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1748019149870,
+      "tag": "0003_little_smasher",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1748019589390,
+      "tag": "0004_chief_the_anarchist",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1748020593168,
+      "tag": "0005_certain_black_knight",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1748022165823,
+      "tag": "0006_abnormal_jubilee",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1748205477200,
+      "tag": "0007_married_thor_girl",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1748528927776,
+      "tag": "0008_volatile_wind_dancer",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1748783812562,
+      "tag": "0009_dizzy_starhawk",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1749277532826,
+      "tag": "0010_nosy_silver_centurion",
       "breakpoints": true
     }
   ]
