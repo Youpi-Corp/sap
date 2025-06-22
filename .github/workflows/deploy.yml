@@ -34,20 +34,13 @@ jobs:
             bun.lockb
             drizzle/       # Add the drizzle folder containing SQL migrations
             # Add any other files needed for production
-
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    environment: Production # Add this line to target the Production environment
+    environment: Production
     steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-artifacts
-          path: ./deploy_package # Download to a temporary directory
-
-      - name: List downloaded artifact contents # New step
-        run: ls -la ./deploy_package
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up SSH
         uses: webfactory/ssh-agent@v0.9.0
@@ -57,68 +50,50 @@ jobs:
       - name: Add known hosts
         run: ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy to VM # Renamed - Only ensures directory exists now
-        run: |
-          echo "Ensuring deployment directory exists on VM..."
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ${{ secrets.DEPLOY_PATH }}"
-
-      - name: Sync files and Restart application via PM2 # Renamed and modified
+      - name: Deploy to VM and run migrations
         env:
-          # Make secrets available to the rsync/ssh step
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           PORT: ${{ secrets.PORT }}
         run: |
-          echo "Syncing files via rsync..."
-          # Ensure rsync copies the drizzle folder too
-          rsync -avz --delete ./deploy_package/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
+          echo "Ensuring deployment directory exists on VM..."
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ${{ secrets.DEPLOY_PATH }}"
 
-          echo "Running commands on VM..."
+          echo "Syncing full source code to VM..."
+          rsync -avz --delete --exclude node_modules --exclude .git ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
+
+          echo "Running deployment commands on VM..."
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << EOF
-            echo "Changing directory to ${{ secrets.DEPLOY_PATH }}"
-            cd ${{ secrets.DEPLOY_PATH }} || exit 1 # Exit if cd fails
+            cd ${{ secrets.DEPLOY_PATH }} || exit 1
 
-            # Export environment variables for the PM2 process
+            # Export environment variables
             export NODE_ENV="production"
             export PORT="${PORT:-8080}"
             export DATABASE_URL="${DATABASE_URL}"
             export JWT_SECRET="${JWT_SECRET}"
 
-            # Install production dependencies directly on the VM
+            # Install all dependencies (including dev dependencies for drizzle-kit)
+            echo "Installing dependencies..."
+            bun install --frozen-lockfile
+
+            # Run migrations with Drizzle Kit
+            echo "Running database migrations with Drizzle Kit..."
+            bun run drizzle-kit generate
+            bun run drizzle-kit migrate
+
+            # Build the application
+            echo "Building application..."
+            bun run build
+
+            # Install production dependencies only
             echo "Installing production dependencies..."
-            bun install --production --frozen-lockfile            # Note: Migrations are handled separately in GitHub Actions
+            bun install --production --frozen-lockfile
 
             # Start or restart the application using PM2
             echo "Restarting application with PM2..."
-            # Try restarting first, if it fails (e.g., not found), then start it.
             /usr/local/bin/pm2 restart brainforest-api --update-env || /usr/local/bin/pm2 start npm --name brainforest-api -- run start --update-env
 
-            # Add a small delay
             sleep 2
-            /usr/local/bin/pm2 save # Save the process list
-            echo "Deployment complete. Application managed by PM2."          EOF
-
-  migrate:
-    name: Run Database Migrations
-    needs: build
-    runs-on: ubuntu-latest
-    environment: Production # Access to production secrets
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Run database migrations
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: |
-          echo "Generating and applying migrations with Drizzle Kit..."
-          bun run drizzle-kit generate
-          bun run drizzle-kit migrate
+            /usr/local/bin/pm2 save
+            echo "Deployment complete. Application managed by PM2."
+          EOF
