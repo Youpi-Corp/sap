@@ -59,11 +59,11 @@ jobs:
             set -e
             cd ${{ env.DEPLOY_PATH }}
             
-            # Set environment variables
+            # Set environment variables for this session
             export NODE_ENV=production
-            export DATABASE_URL="${{ env.DATABASE_URL }}"
-            export JWT_SECRET="${{ env.JWT_SECRET }}"
-            export PORT="${{ env.PORT }}"
+            export DATABASE_URL="${{ secrets.DATABASE_URL }}"
+            export JWT_SECRET="${{ secrets.JWT_SECRET }}"
+            export PORT="${{ secrets.PORT }}"
             
             # Install production dependencies
             bun install --production --frozen-lockfile
