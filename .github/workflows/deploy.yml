@@ -75,15 +75,26 @@ jobs:
             export NODE_ENV="production"
             export PORT="${PORT:-8080}"
             export DATABASE_URL="${DATABASE_URL}"
-            export JWT_SECRET="${JWT_SECRET}"
-
-            # Install production dependencies only
-            echo "Installing production dependencies..."
-            bun install --production --frozen-lockfile
-
-            # Build the application on the VM
+            export JWT_SECRET="${JWT_SECRET}"            # Install all dependencies for building (including dev dependencies)
+            echo "Installing dependencies for build..."
+            bun install --frozen-lockfile            # Build the application on the VM
             echo "Building application..."
-            bun run build
+            if ! bun run build; then
+              echo "❌ Build failed, attempting alternative build method..."
+              # Fallback: manual build steps
+              echo "Cleaning dist directory..."
+              rm -rf dist || true
+              echo "Creating dist directory..."
+              mkdir -p dist
+              echo "Compiling application..."
+              bun build ./src/index.ts --outdir ./dist --target bun
+              echo "Copying drizzle files..."
+              mkdir -p dist/drizzle && cp -r drizzle/* dist/drizzle/ || echo "Warning: Could not copy drizzle files"
+            fi
+
+            # Clean up dev dependencies after build
+            echo "Removing dev dependencies..."
+            bun install --production --frozen-lockfile
 
             # Verify the build was successful
             if [ ! -f "dist/index.js" ]; then
