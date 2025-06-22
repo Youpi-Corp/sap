@@ -64,10 +64,10 @@ jobs:
           PORT: ${{ secrets.PORT }}
         run: |
           echo "Ensuring deployment directory exists on VM..."
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ${{ secrets.DEPLOY_PATH }}"
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ${{ secrets.DEPLOY_PATH }}"          echo "Syncing full source code to VM..."
+          rsync -avz --delete --exclude node_modules --exclude .git ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
 
-          echo "Syncing full source code to VM..."
-          rsync -avz --delete --exclude node_modules --exclude .git ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/          echo "Running deployment commands on VM..."
+          echo "Running deployment commands on VM..."
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << EOF
             cd ${{ secrets.DEPLOY_PATH }} || exit 1
 
@@ -75,11 +75,11 @@ jobs:
             export NODE_ENV="production"
             export PORT="${PORT:-8080}"
             export DATABASE_URL="${DATABASE_URL}"
-            export JWT_SECRET="${JWT_SECRET}"
-
-            # Install production dependencies only
+            export JWT_SECRET="${JWT_SECRET}"            # Install production dependencies only
             echo "Installing production dependencies..."
-            bun install --production --frozen-lockfile            # Run database migrations using drizzle-kit
+            bun install --production --frozen-lockfile
+
+            # Run database migrations using drizzle-kit
             echo "Validating migration environment..."
             bun run db:validate
             
