@@ -55,15 +55,13 @@ export function setupAuth() {
                         sub: userId.toString(),
                         roles: roles,
                         iat: Math.floor(Date.now() / 1000)
-                    });
-
-                    cookie[COOKIE_NAME].set({
+                    }); cookie[COOKIE_NAME].set({
                         value: token,
                         httpOnly: true,
                         path: "/",
                         maxAge: 86400, // 1 day in seconds
-                        secure: true,
-                        sameSite: "none"
+                        secure: process.env.NODE_ENV === "production",
+                        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
                     });
 
                     return token;

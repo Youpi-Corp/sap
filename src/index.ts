@@ -38,25 +38,35 @@ const app = new Elysia()
   )
   // Puis ajoutez les autres middlewares
   .use(setupErrorHandler())
-  .use(cookie())
-  .use(
+  .use(cookie()).use(
     cors({
+      origin: process.env.NODE_ENV === "production"
+        ? ["https://brain-forest.works", "https://www.brain-forest.works"]
+        : true, // Allow all origins in development
+      credentials: true,
       allowedHeaders: [
         "Content-Type",
         "Authorization",
         "X-Requested-With",
         "Accept",
+        "Cookie",
+        "Set-Cookie"
       ],
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       maxAge: 3600,
     })
-  )
-  // Add request logging middleware
+  )// Add request logging middleware
   .onRequest(({ request }) => {
     const timestamp = new Date().toISOString();
     const method = request.method;
     const url = request.url;
-    console.log(`[${timestamp}] ${method} ${url}`);
+    const origin = request.headers.get('origin');
+    console.log(`[${timestamp}] ${method} ${url} from origin: ${origin || 'none'}`);
+
+    // Log preflight requests specifically
+    if (method === 'OPTIONS') {
+      console.log(`[PREFLIGHT] ${url} from ${origin || 'unknown origin'}`);
+    }
   })
   .use(setupRoutes)
   .get("/health", () => {
