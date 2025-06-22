@@ -72,27 +72,34 @@ jobs:
               npm install -g pm2
             fi
             
-            # Find Bun installation path
-            BUN_PATH=""
-            if [ -f "$HOME/.bun/bin/bun" ]; then
-              BUN_PATH="$HOME/.bun/bin/bun"
-            elif command -v bun &> /dev/null; then
-              BUN_PATH=$(which bun)
-            else
-              echo "❌ Bun not found on server"
-              exit 1
-            fi
+            # Create ecosystem file for proper environment handling
+            echo "module.exports = {" > ecosystem.config.js
+            echo "  apps: [{" >> ecosystem.config.js
+            echo "    name: '${{ env.APP_NAME }}'," >> ecosystem.config.js
+            echo "    script: 'dist/index.js'," >> ecosystem.config.js
+            echo "    interpreter: 'bun'," >> ecosystem.config.js
+            echo "    cwd: '${{ env.DEPLOY_PATH }}'," >> ecosystem.config.js
+            echo "    env: {" >> ecosystem.config.js
+            echo "      NODE_ENV: 'production'," >> ecosystem.config.js
+            echo "      PORT: '${{ secrets.PORT }}'," >> ecosystem.config.js
+            echo "      DATABASE_URL: '${{ secrets.DATABASE_URL }}'," >> ecosystem.config.js
+            echo "      JWT_SECRET: '${{ secrets.JWT_SECRET }}'" >> ecosystem.config.js
+            echo "    }," >> ecosystem.config.js
+            echo "    instances: 1," >> ecosystem.config.js
+            echo "    autorestart: true," >> ecosystem.config.js
+            echo "    watch: false," >> ecosystem.config.js
+            echo "    max_memory_restart: '1G'" >> ecosystem.config.js
+            echo "  }]" >> ecosystem.config.js
+            echo "};" >> ecosystem.config.js
             
-            echo "Using Bun at: $BUN_PATH"
+            # Create logs directory
+            mkdir -p logs
             
             # Restart PM2 process
             pm2 delete ${{ env.APP_NAME }} 2>/dev/null || true
             
-            # Start the application using Bun interpreter
-            pm2 start --interpreter "$BUN_PATH" \
-              --name ${{ env.APP_NAME }} \
-              dist/index.js
-            
+            # Start using ecosystem file
+            pm2 start ecosystem.config.js
             pm2 save
             
             # Health check
