@@ -12,7 +12,7 @@ console.log("Environment:", process.env.NODE_ENV || "development");
 console.log("Port:", process.env.PORT || "8080");
 console.log("CORS Origins:", process.env.NODE_ENV === "production"
   ? ["https://brain-forest.works", "https://www.brain-forest.works"]
-  : "all origins (development)"
+  : ["https://dev.brain-forest.works", "https://api.dev.brain-forest.works", "localhost", "127.0.0.1"]
 );
 
 // Get port from environment variable
@@ -46,12 +46,16 @@ const app = new Elysia()
       origin: (request) => {
         const origin = request.headers.get('origin');
         console.log(`CORS: Checking origin: ${origin || 'none'}`);
-        console.log(`CORS: Environment: ${process.env.NODE_ENV || 'undefined'}`);
-
-        // Always allow these production origins regardless of NODE_ENV
+        console.log(`CORS: Environment: ${process.env.NODE_ENV || 'undefined'}`);        // Always allow these production origins regardless of NODE_ENV
         const productionOrigins = [
           "https://brain-forest.works",
           "https://www.brain-forest.works"
+        ];
+
+        // Development origins
+        const developmentOrigins = [
+          "https://dev.brain-forest.works",
+          "https://api.dev.brain-forest.works"
         ];
 
         // If no origin (direct requests), allow
@@ -63,6 +67,12 @@ const app = new Elysia()
         // Check if it's a production origin
         if (productionOrigins.includes(origin)) {
           console.log(`CORS: Production origin allowed: ${origin}`);
+          return true;
+        }
+
+        // Check if it's a development origin
+        if (developmentOrigins.includes(origin)) {
+          console.log(`CORS: Development origin allowed: ${origin}`);
           return true;
         }
 
