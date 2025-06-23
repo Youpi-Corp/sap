@@ -40,53 +40,16 @@ const app = new Elysia()
       },
     }))  // Puis ajoutez les autres middlewares
   .use(setupErrorHandler())
-  .use(cookie())
-  .use(
+  .use(cookie()).use(
     cors({
-      origin: (request) => {
-        const origin = request.headers.get('origin');
-        console.log(`CORS: Checking origin: ${origin || 'none'}`);
-        console.log(`CORS: Environment: ${process.env.NODE_ENV || 'undefined'}`);        // Always allow these production origins regardless of NODE_ENV
-        const productionOrigins = [
-          "https://brain-forest.works",
-          "https://www.brain-forest.works"
-        ];
-
-        // Development origins
-        const developmentOrigins = [
-          "https://dev.brain-forest.works",
-          "https://api.dev.brain-forest.works"
-        ];
-
-        // If no origin (direct requests), allow
-        if (!origin) {
-          console.log('CORS: No origin header, allowing request');
-          return true;
-        }
-
-        // Check if it's a production origin
-        if (productionOrigins.includes(origin)) {
-          console.log(`CORS: Production origin allowed: ${origin}`);
-          return true;
-        }
-
-        // Check if it's a development origin
-        if (developmentOrigins.includes(origin)) {
-          console.log(`CORS: Development origin allowed: ${origin}`);
-          return true;
-        }
-
-        // In development or for localhost, allow all
-        if (process.env.NODE_ENV !== "production" ||
-          origin.includes('localhost') ||
-          origin.includes('127.0.0.1')) {
-          console.log(`CORS: Development/localhost origin allowed: ${origin}`);
-          return true;
-        }
-
-        console.log(`CORS: Origin blocked: ${origin}`);
-        return false;
-      },
+      origin: [
+        "https://brain-forest.works",
+        "https://www.brain-forest.works",
+        "https://dev.brain-forest.works",
+        "https://api.dev.brain-forest.works",
+        /^https?:\/\/localhost(:\d+)?$/,
+        /^https?:\/\/127\.0\.0\.1(:\d+)?$/
+      ],
       credentials: true,
       allowedHeaders: [
         "Content-Type",
