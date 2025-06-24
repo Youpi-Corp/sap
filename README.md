@@ -126,7 +126,7 @@ src/
 The API is documented with Swagger and accessible at:
 
 - Local: http://localhost:8080/swagger (if `PORT` is set to 8080)
-- Production: https://sap-m1i0.onrender.com/swagger
+- Production: https://api.brain-forest/swagger
 
 ## API Endpoints
 
