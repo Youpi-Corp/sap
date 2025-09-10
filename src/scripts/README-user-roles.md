@@ -2,6 +2,8 @@
 
 This directory contains scripts for managing user roles in the SAP application.
 
+> **Important**: New users are automatically assigned both `user` and `teacher` roles by default. Existing users can be updated to have these default roles using the `update-default-roles.ts` script.
+
 ## Available Scripts
 
 ### 1. `set-user-roles.ts` - Set/Replace User Roles
@@ -57,6 +59,14 @@ Creates the default roles in the database (should be run first).
 bun run src/scripts/init-roles.ts
 ```
 
+### 5. `update-default-roles.ts` - Update Existing Users with New Default Roles
+
+Updates existing users to have the current default roles (user and teacher). This is useful when you change the default roles and want to apply them to existing users.
+
+```bash
+bun run src/scripts/update-default-roles.ts
+```
+
 ## User Identification
 
 All scripts support identifying users by:
@@ -68,11 +78,13 @@ All scripts support identifying users by:
 
 The system supports these predefined roles:
 
-- **`user`** - Standard user with basic permissions
+- **`user`** - Standard user with basic permissions *(default)*
+- **`teacher`** - Teacher with course management capabilities *(default)*
 - **`admin`** - Administrator with full system access
-- **`teacher`** - Teacher with course management capabilities
 - **`content_creator`** - Can create and manage premium content
 - **`moderator`** - Can moderate user content and comments
+
+> **Note**: New users are automatically assigned both `user` and `teacher` roles by default.
 
 ## Prerequisites
 
