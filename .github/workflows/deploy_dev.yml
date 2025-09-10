@@ -1,0 +1,113 @@
+name: Deploy to Development
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+env:
+  APP_NAME: brainforest-api-dev
+  DEPLOY_PATH: ~/brainforest-api-dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: development
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies and build
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add server to known hosts
+        run: ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to server
+        run: |
+          # Create deployment directory
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ${{ env.DEPLOY_PATH }}"
+          # Sync files (exclude unnecessary files)
+          rsync -avz --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.env*' \
+            --exclude='*.log' \
+            ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ env.DEPLOY_PATH }}/
+      - name: Install and restart application
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          PORT: ${{ secrets.PORT }}
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            set -e
+            cd ${{ env.DEPLOY_PATH }}
+            
+            # Set environment variables for this session
+            export NODE_ENV=development
+            export DATABASE_URL="${{ secrets.DATABASE_URL }}"
+            export JWT_SECRET="${{ secrets.JWT_SECRET }}"
+            export PORT="${{ secrets.PORT }}"
+            
+            # Install production dependencies
+            bun install --production --frozen-lockfile
+            
+            # Run migrations
+            bun run migrate
+            
+            # Install PM2 if not already installed
+            if ! command -v pm2 &> /dev/null; then
+              npm install -g pm2
+            fi
+            
+            # Restart PM2 process
+            pm2 delete ${{ env.APP_NAME }} 2>/dev/null || true
+            
+            # Start the application with explicit environment variables
+            pm2 start "bun" \
+              --name ${{ env.APP_NAME }} \
+              --cwd ${{ env.DEPLOY_PATH }} \
+              --env NODE_ENV=development \
+              --env PORT=${{ secrets.PORT }} \
+              --env HOST=0.0.0.0 \
+              --env DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+              --env JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+              -- dist/index.js
+            
+            pm2 save
+            
+            # Health check
+            sleep 3
+            if pm2 list | grep -q "${{ env.APP_NAME }}.*online"; then
+              echo "✅ PM2 process is online"
+              
+              # Additional debugging information
+              echo "🔍 Checking process details:"
+              pm2 show ${{ env.APP_NAME }}
+              
+              echo "🔍 Checking if application is listening on port:"
+              netstat -tlnp | grep ${{ secrets.PORT }} || echo "No process listening on port ${{ secrets.PORT }}"
+              
+              echo "🔍 Testing local connection:"
+              curl -s http://localhost:${{ secrets.PORT }}/health || curl -s http://localhost:${{ secrets.PORT }} || echo "Local connection test failed"
+              
+              echo "✅ Development deployment successful - check logs if there are connection issues"
+            else
+              echo "❌ Development deployment failed"
+              pm2 logs ${{ env.APP_NAME }} --lines 10
+              exit 1
+            fi
+          EOF

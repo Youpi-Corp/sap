@@ -3,7 +3,7 @@ import { users, refreshTokens } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { hashPassword, verifyPassword } from "../utils/password";
 import { NotFoundError, ApiError } from "../middleware/error";
-import { isValidRole, getDefaultRole } from "../utils/roles";
+import { isValidRole, getDefaultRoles, RoleType } from "../utils/roles";
 
 // User types
 export interface User {
@@ -72,15 +72,19 @@ export class UserService {  /**
     // Assign roles to the new user in the user_roles table
     const { roleService } = await import("./role");
     try {
-      // Get the default USER role
-      const userRole = await roleService.getRoleByName(getDefaultRole());
-      await roleService.assignRoleToUser(result[0].id, userRole.id);
+      // Get the default roles (USER and TEACHER)
+      const defaultRoles = getDefaultRoles();
+      
+      for (const defaultRoleName of defaultRoles) {
+        const defaultRole = await roleService.getRoleByName(defaultRoleName);
+        await roleService.assignRoleToUser(result[0].id, defaultRole.id);
+      }
 
       // If the user should have additional roles and the creator is an admin
       if (isAdmin && userRoles.length > 0) {
         for (const roleName of userRoles) {
-          // Skip if it's the default role (already assigned)
-          if (roleName === getDefaultRole()) continue;
+          // Skip if it's already assigned as a default role
+          if (defaultRoles.includes(roleName as RoleType)) continue;
 
           // Validate the role
           if (!isValidRole(roleName)) {
@@ -99,7 +103,7 @@ export class UserService {  /**
       }
     } catch (err) {
       // Log role assignment error but don't fail user creation
-      console.error("Error assigning default role to new user:", err);
+      console.error("Error assigning default roles to new user:", err);
     }
 
     return result[0];
@@ -188,9 +192,12 @@ export class UserService {  /**
         const currentRoles = await roleService.getUserRoles(id);
         const currentRoleNames = currentRoles.map(r => r.name);
 
+        // Get default roles that should always be assigned
+        const defaultRoles = getDefaultRoles();
+
         // Determine roles to add and roles to remove
         const rolesToAdd = rolesToUpdate.filter(r => !currentRoleNames.includes(r));
-        const rolesToRemove = currentRoles.filter(r => !rolesToUpdate.includes(r.name) && r.name !== getDefaultRole());
+        const rolesToRemove = currentRoles.filter(r => !rolesToUpdate.includes(r.name) && !defaultRoles.includes(r.name as RoleType));
 
         // Add new roles
         for (const roleName of rolesToAdd) {
@@ -209,8 +216,8 @@ export class UserService {  /**
 
         // Remove roles no longer needed
         for (const role of rolesToRemove) {
-          // Never remove the default user role
-          if (role.name === getDefaultRole()) continue;
+          // Never remove default roles
+          if (defaultRoles.includes(role.name as RoleType)) continue;
 
           try {
             await roleService.removeRoleFromUser(id, role.id);

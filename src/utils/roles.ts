@@ -113,6 +113,10 @@ export function getDefaultRole(): RoleType {
     return ROLES.USER;
 }
 
+export function getDefaultRoles(): RoleType[] {
+    return [ROLES.USER, ROLES.TEACHER];
+}
+
 /**
  * Check if a user has a specific permission based on their roles
  * @param userRoles Array of role names the user has
