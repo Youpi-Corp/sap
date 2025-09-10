@@ -74,6 +74,7 @@ export class UserService {  /**
     try {
       // Get the default roles (USER and TEACHER)
       const defaultRoles = getDefaultRoles();
+      
       for (const defaultRoleName of defaultRoles) {
         const defaultRole = await roleService.getRoleByName(defaultRoleName);
         await roleService.assignRoleToUser(result[0].id, defaultRole.id);
