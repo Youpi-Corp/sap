@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx @action-validator/cli:*)"
+      "Bash(npx @action-validator/cli:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []
