@@ -102,11 +102,6 @@ jobs:
               npm install -g pm2
             fi
 
-            # Configure PM2 log rotation
-            pm2 install pm2-logrotate || true
-            pm2 set pm2-logrotate:max_size 10M || true
-            pm2 set pm2-logrotate:retain 7 || true
-
             # Setup PM2 startup script
             echo "⚙️  Configuring PM2 startup..."
             PM2_STARTUP_CMD=$(pm2 startup systemd -u $USER --hp $HOME | tail -n 1)
@@ -124,7 +119,7 @@ jobs:
               --name ${{ env.APP_NAME }} \
               --cwd ${{ env.DEPLOY_PATH }} \
               --max-restarts 10 \
-              --min-uptime 10000 \
+              --min_uptime 10000 \
               --restart-delay 3000 \
               --env NODE_ENV=development \
               --env PORT=${{ secrets.PORT }} \
@@ -134,6 +129,13 @@ jobs:
               -- dist/index.js
 
             # Save PM2 process list for resurrection
+            pm2 save
+
+            # Configure PM2 log rotation (after save)
+            echo "⚙️  Configuring PM2 log rotation..."
+            pm2 install pm2-logrotate || echo "⚠️  PM2 logrotate install failed, skipping..."
+            pm2 set pm2-logrotate:max_size 10M || true
+            pm2 set pm2-logrotate:retain 7 || true
             pm2 save
 
             echo "✅ Application started"
