@@ -154,6 +154,8 @@ jobs:
           EOF
 
       - name: Configure and verify nginx
+        env:
+          PORT: ${{ secrets.PORT }}
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
             echo "🔧 Configuring Nginx..."
@@ -163,6 +165,31 @@ jobs:
               echo "📦 Installing Nginx..."
               sudo apt-get update
               sudo apt-get install -y nginx
+            fi
+
+            # Create nginx site configuration if missing
+            if [ ! -f /etc/nginx/sites-enabled/dev.conf ]; then
+              echo "📝 Creating nginx site configuration for development..."
+              cat << 'NGINX_CONFIG' | sudo tee /etc/nginx/sites-available/dev.conf > /dev/null
+            server {
+                listen 80;
+                server_name dev.brainforest.youpi.ovh;
+
+                location / {
+                    proxy_pass http://localhost:${{ secrets.PORT }};
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade \$http_upgrade;
+                    proxy_set_header Connection 'upgrade';
+                    proxy_set_header Host \$host;
+                    proxy_set_header X-Real-IP \$remote_addr;
+                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto \$scheme;
+                    proxy_cache_bypass \$http_upgrade;
+                }
+            }
+            NGINX_CONFIG
+              sudo ln -sf /etc/nginx/sites-available/dev.conf /etc/nginx/sites-enabled/dev.conf
+              echo "✅ Created nginx configuration"
             fi
 
             # Test nginx configuration
@@ -196,11 +223,10 @@ jobs:
               if sudo netstat -tlnp 2>/dev/null | grep -q ':443.*nginx'; then
                 echo "✅ Nginx listening on port 443"
               else
-                echo "⚠️  Nginx not listening on port 443"
+                echo "⚠️  Nginx not listening on port 443 (SSL not configured)"
               fi
             else
               echo "❌ Nginx configuration test failed"
-              echo "⚠️  Missing nginx site configuration (e.g., /etc/nginx/sites-enabled/dev.conf)"
               echo "⚠️  Continuing deployment without nginx restart"
             fi
           EOF
