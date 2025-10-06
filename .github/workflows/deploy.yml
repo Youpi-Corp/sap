@@ -116,28 +116,26 @@ jobs:
 
             # Create PM2 ecosystem config for advanced restart policies
             echo "📝 Creating PM2 ecosystem configuration..."
-            cat > ecosystem.config.js <<'ECOSYSTEM_EOF'
-            module.exports = {
-              apps: [{
-                name: "${{ env.APP_NAME }}",
-                script: "bun",
-                args: "dist/index.js",
-                cwd: "${{ env.DEPLOY_PATH }}",
-                env: {
-                  NODE_ENV: "production",
-                  PORT: "${{ secrets.PORT }}",
-                  HOST: "0.0.0.0",
-                  DATABASE_URL: "${{ secrets.DATABASE_URL }}",
-                  JWT_SECRET: "${{ secrets.JWT_SECRET }}"
-                },
-                max_restarts: 10,
-                min_uptime: "10s",
-                restart_delay: 3000,
-                autorestart: true,
-                watch: false
-              }]
-            };
-            ECOSYSTEM_EOF
+            echo 'module.exports = {' > ecosystem.config.js
+            echo '  apps: [{' >> ecosystem.config.js
+            echo '    name: "${{ env.APP_NAME }}",' >> ecosystem.config.js
+            echo '    script: "bun",' >> ecosystem.config.js
+            echo '    args: "dist/index.js",' >> ecosystem.config.js
+            echo '    cwd: "${{ env.DEPLOY_PATH }}",' >> ecosystem.config.js
+            echo '    env: {' >> ecosystem.config.js
+            echo '      NODE_ENV: "production",' >> ecosystem.config.js
+            echo '      PORT: "${{ secrets.PORT }}",' >> ecosystem.config.js
+            echo '      HOST: "0.0.0.0",' >> ecosystem.config.js
+            echo '      DATABASE_URL: "${{ secrets.DATABASE_URL }}",' >> ecosystem.config.js
+            echo '      JWT_SECRET: "${{ secrets.JWT_SECRET }}"' >> ecosystem.config.js
+            echo '    },' >> ecosystem.config.js
+            echo '    max_restarts: 10,' >> ecosystem.config.js
+            echo '    min_uptime: "10s",' >> ecosystem.config.js
+            echo '    restart_delay: 3000,' >> ecosystem.config.js
+            echo '    autorestart: true,' >> ecosystem.config.js
+            echo '    watch: false' >> ecosystem.config.js
+            echo '  }]' >> ecosystem.config.js
+            echo '};' >> ecosystem.config.js
 
             # Start the application with ecosystem config
             echo "🚀 Starting application..."
@@ -170,7 +168,7 @@ jobs:
 
             # Test nginx configuration
             echo "🧪 Testing Nginx configuration..."
-            if sudo nginx -t; then
+            if sudo nginx -t 2>&1; then
               echo "✅ Nginx configuration is valid"
 
               # Enable nginx to start on boot
@@ -185,25 +183,26 @@ jobs:
                 echo "✅ Nginx is running"
               else
                 echo "❌ Nginx failed to start"
-                sudo systemctl status nginx
+                sudo systemctl status nginx || true
               fi
 
               # Check if nginx is listening on ports
               echo "🔍 Checking Nginx ports..."
-              if sudo netstat -tlnp | grep -q ':80.*nginx'; then
+              if sudo netstat -tlnp 2>/dev/null | grep -q ':80.*nginx'; then
                 echo "✅ Nginx listening on port 80"
               else
                 echo "⚠️  Nginx not listening on port 80"
               fi
 
-              if sudo netstat -tlnp | grep -q ':443.*nginx'; then
+              if sudo netstat -tlnp 2>/dev/null | grep -q ':443.*nginx'; then
                 echo "✅ Nginx listening on port 443"
               else
                 echo "⚠️  Nginx not listening on port 443"
               fi
             else
               echo "❌ Nginx configuration test failed"
-              echo "⚠️  Continuing deployment, but nginx may not be working correctly"
+              echo "⚠️  Missing nginx site configuration files"
+              echo "⚠️  Continuing deployment without nginx restart"
             fi
           EOF
 
