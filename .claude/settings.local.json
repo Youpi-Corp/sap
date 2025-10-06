@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx @action-validator/cli:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
