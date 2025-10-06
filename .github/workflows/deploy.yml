@@ -121,7 +121,6 @@ jobs:
             echo '    name: "${{ env.APP_NAME }}",' >> ecosystem.config.cjs
             echo '    script: "bun",' >> ecosystem.config.cjs
             echo '    args: "dist/index.js",' >> ecosystem.config.cjs
-            echo '    cwd: "${{ env.DEPLOY_PATH }}",' >> ecosystem.config.cjs
             echo '    env: {' >> ecosystem.config.cjs
             echo '      NODE_ENV: "production",' >> ecosystem.config.cjs
             echo '      PORT: "${{ secrets.PORT }}",' >> ecosystem.config.cjs
