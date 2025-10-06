@@ -115,28 +115,28 @@ jobs:
 
             # Create PM2 ecosystem config for advanced restart policies
             echo "📝 Creating PM2 ecosystem configuration..."
-            cat > ecosystem.config.js << 'ECOSYSTEM_EOF'
-module.exports = {
-  apps: [{
-    name: "${{ env.APP_NAME }}",
-    script: "bun",
-    args: "dist/index.js",
-    cwd: "${{ env.DEPLOY_PATH }}",
-    env: {
-      NODE_ENV: "development",
-      PORT: "${{ secrets.PORT }}",
-      HOST: "0.0.0.0",
-      DATABASE_URL: "${{ secrets.DATABASE_URL }}",
-      JWT_SECRET: "${{ secrets.JWT_SECRET }}"
-    },
-    max_restarts: 10,
-    min_uptime: "10s",
-    restart_delay: 3000,
-    autorestart: true,
-    watch: false
-  }]
-};
-ECOSYSTEM_EOF
+            cat > ecosystem.config.js <<'ECOSYSTEM_EOF'
+            module.exports = {
+              apps: [{
+                name: "${{ env.APP_NAME }}",
+                script: "bun",
+                args: "dist/index.js",
+                cwd: "${{ env.DEPLOY_PATH }}",
+                env: {
+                  NODE_ENV: "development",
+                  PORT: "${{ secrets.PORT }}",
+                  HOST: "0.0.0.0",
+                  DATABASE_URL: "${{ secrets.DATABASE_URL }}",
+                  JWT_SECRET: "${{ secrets.JWT_SECRET }}"
+                },
+                max_restarts: 10,
+                min_uptime: "10s",
+                restart_delay: 3000,
+                autorestart: true,
+                watch: false
+              }]
+            };
+            ECOSYSTEM_EOF
 
             # Start the application with ecosystem config
             echo "🚀 Starting application..."
