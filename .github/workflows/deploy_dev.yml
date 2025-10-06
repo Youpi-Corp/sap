@@ -115,30 +115,30 @@ jobs:
 
             # Create PM2 ecosystem config for advanced restart policies
             echo "📝 Creating PM2 ecosystem configuration..."
-            echo 'module.exports = {' > ecosystem.config.js
-            echo '  apps: [{' >> ecosystem.config.js
-            echo '    name: "${{ env.APP_NAME }}",' >> ecosystem.config.js
-            echo '    script: "bun",' >> ecosystem.config.js
-            echo '    args: "dist/index.js",' >> ecosystem.config.js
-            echo '    cwd: "${{ env.DEPLOY_PATH }}",' >> ecosystem.config.js
-            echo '    env: {' >> ecosystem.config.js
-            echo '      NODE_ENV: "development",' >> ecosystem.config.js
-            echo '      PORT: "${{ secrets.PORT }}",' >> ecosystem.config.js
-            echo '      HOST: "0.0.0.0",' >> ecosystem.config.js
-            echo '      DATABASE_URL: "${{ secrets.DATABASE_URL }}",' >> ecosystem.config.js
-            echo '      JWT_SECRET: "${{ secrets.JWT_SECRET }}"' >> ecosystem.config.js
-            echo '    },' >> ecosystem.config.js
-            echo '    max_restarts: 10,' >> ecosystem.config.js
-            echo '    min_uptime: "10s",' >> ecosystem.config.js
-            echo '    restart_delay: 3000,' >> ecosystem.config.js
-            echo '    autorestart: true,' >> ecosystem.config.js
-            echo '    watch: false' >> ecosystem.config.js
-            echo '  }]' >> ecosystem.config.js
-            echo '};' >> ecosystem.config.js
+            echo 'module.exports = {' > ecosystem.config.cjs
+            echo '  apps: [{' >> ecosystem.config.cjs
+            echo '    name: "${{ env.APP_NAME }}",' >> ecosystem.config.cjs
+            echo '    script: "bun",' >> ecosystem.config.cjs
+            echo '    args: "dist/index.js",' >> ecosystem.config.cjs
+            echo '    cwd: "${{ env.DEPLOY_PATH }}",' >> ecosystem.config.cjs
+            echo '    env: {' >> ecosystem.config.cjs
+            echo '      NODE_ENV: "development",' >> ecosystem.config.cjs
+            echo '      PORT: "${{ secrets.PORT }}",' >> ecosystem.config.cjs
+            echo '      HOST: "0.0.0.0",' >> ecosystem.config.cjs
+            echo '      DATABASE_URL: "${{ secrets.DATABASE_URL }}",' >> ecosystem.config.cjs
+            echo '      JWT_SECRET: "${{ secrets.JWT_SECRET }}"' >> ecosystem.config.cjs
+            echo '    },' >> ecosystem.config.cjs
+            echo '    max_restarts: 10,' >> ecosystem.config.cjs
+            echo '    min_uptime: "10s",' >> ecosystem.config.cjs
+            echo '    restart_delay: 3000,' >> ecosystem.config.cjs
+            echo '    autorestart: true,' >> ecosystem.config.cjs
+            echo '    watch: false' >> ecosystem.config.cjs
+            echo '  }]' >> ecosystem.config.cjs
+            echo '};' >> ecosystem.config.cjs
 
             # Start the application with ecosystem config
             echo "🚀 Starting application..."
-            pm2 start ecosystem.config.js
+            pm2 start ecosystem.config.cjs
 
             # Save PM2 process list for resurrection
             pm2 save
