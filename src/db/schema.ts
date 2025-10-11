@@ -15,6 +15,7 @@ export const users = pgTable("user", {
   password_hash: text("password_hash"),
   biography: text("biography"),
   profile_picture: text("profile_picture"),
+  community_updates: boolean("community_updates").notNull().default(false), // User preference for community updates
 });
 
 // Role definitions table

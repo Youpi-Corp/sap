@@ -141,9 +141,18 @@ src/
    ```env
    DATABASE_URL=postgresql://username:password@localhost:5432/brainforest
    JWT_SECRET=your_super_secure_jwt_secret_key_here
+   JWT_REFRESH_SECRET=your_refresh_secret_key_here
    PORT=8080
    NODE_ENV=development
+   
+   # Email Service (Optional - see EMAIL_SETUP.md for details)
+   RESEND_API_KEY=re_xxxxxxxxxxxxx        # For Resend
+   # OR
+   SENDGRID_API_KEY=SG.xxxxxxxxxxxxx      # For SendGrid
+   EMAIL_FROM=noreply@brainforest.dev     # Sender email address
    ```
+
+   **Note:** Without an email service configured, emails will be logged to console. See [EMAIL_SETUP.md](./EMAIL_SETUP.md) for detailed email configuration instructions.
 
 3. **Database Setup**:
 

@@ -26,6 +26,7 @@
     "migrate:multi-roles": "bun run src/db/roles-migration.ts",
     "create:admin": "bun run src/scripts/create-admin.ts",
     "init:roles": "bun run src/scripts/init-roles.ts",
+    "test:email": "bun run src/scripts/test-email.ts",
     "lint": "eslint . --ext .ts",
     "test:watch": "vitest"
   },
