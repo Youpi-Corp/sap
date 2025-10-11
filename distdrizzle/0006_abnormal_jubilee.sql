@@ -1,0 +1,1 @@
+ALTER TABLE "module" ADD COLUMN "public" boolean DEFAULT false NOT NULL;

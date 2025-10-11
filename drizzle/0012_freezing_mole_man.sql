@@ -1,0 +1,1 @@
+ALTER TABLE "user" ADD COLUMN "community_updates" boolean DEFAULT false NOT NULL;
