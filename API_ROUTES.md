@@ -8,6 +8,7 @@ This document provides an overview of all API routes in the Brainforest applicat
 - [User Routes](#user-routes)
 - [Role Routes](#role-routes)
 - [Module Routes](#module-routes)
+- [Module Comment Routes](#module-comment-routes)
 - [Course Routes](#course-routes)
 - [Info Routes](#info-routes)
 
@@ -538,6 +539,105 @@ Base path: `/module`
 - `200`: Module deleted successfully
 - `401`: Authentication required
 - `404`: Module not found
+
+## Module Comment Routes
+
+Base path: `/module-comment`
+
+### GET /module-comment/:moduleId
+
+**Description**: Retrieve all comments for a specific module
+
+**Path Parameters**:
+
+- `moduleId`: Module ID
+
+**Responses**:
+
+- `200`: Comments retrieved successfully
+
+### GET /module-comment/comment/:commentId
+
+**Description**: Retrieve a specific comment by its ID
+
+**Path Parameters**:
+
+- `commentId`: Comment ID
+
+**Responses**:
+
+- `200`: Comment retrieved successfully
+- `404`: Comment not found
+
+### POST /module-comment/create
+
+**Description**: Create a new comment on a module
+
+**Request Body**:
+
+```json
+{
+  "content": "string", // Min length: 1, Max length: 5000
+  "module_id": "number"
+}
+```
+
+**Responses**:
+
+- `201`: Comment created successfully
+- `401`: Authentication required
+- `404`: Module not found
+
+### PUT /module-comment/update/:commentId
+
+**Description**: Update a comment (only owner or admin can update)
+
+**Path Parameters**:
+
+- `commentId`: Comment ID
+
+**Request Body**:
+
+```json
+{
+  "content": "string" // Min length: 1, Max length: 5000
+}
+```
+
+**Responses**:
+
+- `200`: Comment updated successfully
+- `401`: Authentication required
+- `403`: Not authorized to update this comment
+- `404`: Comment not found
+
+### DELETE /module-comment/delete/:commentId
+
+**Description**: Delete a comment (only owner or admin can delete)
+
+**Path Parameters**:
+
+- `commentId`: Comment ID
+
+**Responses**:
+
+- `200`: Comment deleted successfully
+- `401`: Authentication required
+- `403`: Not authorized to delete this comment
+- `404`: Comment not found
+
+### GET /module-comment/user/:userId
+
+**Description**: Retrieve all comments made by a specific user
+
+**Path Parameters**:
+
+- `userId`: User ID
+
+**Responses**:
+
+- `200`: Comments retrieved successfully
+- `401`: Authentication required
 
 ## Course Routes
 

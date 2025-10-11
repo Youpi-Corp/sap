@@ -123,3 +123,13 @@ export const courseCompletions = pgTable("course_completion", {
   course_id: integer("course_id").notNull().references(() => courses.id, { onDelete: "cascade" }),
   completed_at: text("completed_at").notNull().default("NOW()"),
 });
+
+// Module comments table
+export const moduleComments = pgTable("module_comment", {
+  id: serial("id").primaryKey(),
+  content: text("content").notNull(),
+  user_id: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  module_id: integer("module_id").notNull().references(() => modules.id, { onDelete: "cascade" }),
+  created_at: text("created_at").notNull().default("NOW()"),
+  updated_at: text("updated_at").notNull().default("NOW()"),
+});
