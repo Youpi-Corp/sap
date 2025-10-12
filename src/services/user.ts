@@ -536,23 +536,32 @@ export class UserService {  /**
   }
 
   /**
-   * Delete user account with password verification
+   * Delete user account with password or validation phrase verification
    * Performs complete data deletion including all associations
    * @param userId User ID
-   * @param password Password for verification
+   * @param password Password for verification (for non-OAuth users)
+   * @param validationPhrase Validation phrase for OAuth users (optional)
    * @returns True if deletion was successful
    */
-  async deleteUserAccount(userId: number, password: string): Promise<boolean> {
-    // Get user and verify password
+  async deleteUserAccount(userId: number, password: string, validationPhrase?: string): Promise<boolean> {
+    // Get user
     const user = await this.getUserById(userId);
-    
-    if (!user.password_hash) {
-      throw new ApiError("Cannot verify account for deletion", 401);
-    }
 
-    const isValid = await verifyPassword(password, user.password_hash);
-    if (!isValid) {
-      throw new ApiError("Invalid password", 401);
+    // Check if user is OAuth user (no password)
+    const isOAuthUser = !user.password_hash;
+
+    if (isOAuthUser) {
+      // For OAuth users, verify the validation phrase
+      const expectedPhrase = "delete my account";
+      if (!validationPhrase || validationPhrase.toLowerCase().trim() !== expectedPhrase) {
+        throw new ApiError("Invalid validation phrase. Please type 'delete my account' to confirm.", 401);
+      }
+    } else {
+      // For regular users, verify password
+      const isValid = await verifyPassword(password, user.password_hash!);
+      if (!isValid) {
+        throw new ApiError("Invalid password", 401);
+      }
     }
 
     // Send deletion confirmation email before deleting
@@ -575,10 +584,10 @@ export class UserService {  /**
     // - courseLikes (via onDelete: cascade)
     // - courseCompletions (via onDelete: cascade)
     // - moduleComments (via onDelete: cascade)
-    
+
     // Delete the user (cascades will handle the rest)
     const deleted = await this.deleteUser(userId);
-    
+
     return deleted;
   }
 }
