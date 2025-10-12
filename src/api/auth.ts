@@ -3,6 +3,7 @@ import { userService, LoginRequest } from "../services/user";
 import { success, error } from "../utils/response";
 import { setupAuth } from "../middleware/auth";
 import { ROLES } from "../utils/roles";
+import { githubOAuthService } from "../services/github-oauth";
 
 /**
  * Setup auth routes
@@ -165,6 +166,108 @@ export function setupAuthRoutes() {
             },
             "404": {
               description: "User not found",
+            },
+          },
+        },
+      }
+    )
+    .get(
+      "/github",
+      async ({ set }) => {
+        try {
+          // Generate GitHub OAuth authorization URL
+          const authUrl = githubOAuthService.getAuthorizationUrl();
+
+          return success({ url: authUrl });
+        } catch (err: unknown) {
+          console.error("Error generating GitHub OAuth URL:", err);
+          set.status = 500;
+          return error("Failed to initiate GitHub authentication", 500);
+        }
+      },
+      {
+        detail: {
+          tags: ["Authentication"],
+          summary: "Initiate GitHub OAuth",
+          description: "Get GitHub OAuth authorization URL",
+          responses: {
+            "200": {
+              description: "Authorization URL generated successfully",
+            },
+            "500": {
+              description: "Failed to generate authorization URL",
+            },
+          },
+        },
+      }
+    )
+    .get(
+      "/github/callback",
+      async ({ query, set, setAuthCookie }) => {
+        try {
+          const { code } = query;
+
+          if (!code) {
+            set.status = 400;
+            return error("Missing authorization code", 400);
+          }
+
+          // Exchange code for GitHub user info
+          const githubUser = await githubOAuthService.authenticate(code);
+
+          if (!githubUser.id) {
+            set.status = 400;
+            return error("Failed to get GitHub user information", 400);
+          }
+
+          // Find or create user
+          const user = await userService.findOrCreateByGitHub(
+            githubUser.id.toString(),
+            {
+              pseudo: githubUser.login || githubUser.name || undefined,
+              email: githubUser.email || undefined,
+              profile_picture: githubUser.avatar_url || undefined,
+              biography: githubUser.bio || undefined,
+            }
+          );
+
+          // Set JWT token in HTTP-only cookie
+          await setAuthCookie(user.id);
+
+          // Get user's roles from the database for the response
+          const { roleService } = await import("../services/role");
+          const userRoles = await roleService.getUserRoleNames(user.id);
+
+          // Return success response
+          set.status = 200;
+          return success({
+            userId: user.id,
+            roles: userRoles.length > 0 ? userRoles : [ROLES.USER]
+          });
+        } catch (err: unknown) {
+          console.error("GitHub OAuth callback error:", err);
+          set.status = 401;
+          return error((err as Error).message || "GitHub authentication failed", 401);
+        }
+      },
+      {
+        query: t.Object({
+          code: t.String(),
+          state: t.Optional(t.String()),
+        }),
+        detail: {
+          tags: ["Authentication"],
+          summary: "GitHub OAuth callback",
+          description: "Handle GitHub OAuth callback and authenticate user",
+          responses: {
+            "200": {
+              description: "Authentication successful",
+            },
+            "400": {
+              description: "Missing or invalid parameters",
+            },
+            "401": {
+              description: "Authentication failed",
             },
           },
         },
