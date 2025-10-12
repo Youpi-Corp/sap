@@ -16,6 +16,8 @@ export const users = pgTable("user", {
   biography: text("biography"),
   profile_picture: text("profile_picture"),
   community_updates: boolean("community_updates").notNull().default(false), // User preference for community updates
+  github_id: varchar("github_id", { length: 100 }), // GitHub user ID for OAuth
+  google_id: varchar("google_id", { length: 100 }), // Google user ID for OAuth (future use)
 });
 
 // Role definitions table

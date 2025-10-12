@@ -413,23 +413,24 @@ export function setupUserRoutes() {
         }
       )
 
-      // Delete user account (self-deletion with password verification)
+      // Delete user account (self-deletion with password or validation phrase verification)
       .delete("/delete/me",
         async ({ body, requireAuth, set }) => {
           const claims = await requireAuth();
           const currentUserId = parseInt(claims.sub);
 
           try {
-            await userService.deleteUserAccount(currentUserId, body.password);
-            
+            await userService.deleteUserAccount(currentUserId, body.password || "", body.validationPhrase);
+
             // Clear the auth cookie after successful deletion
             set.headers["Set-Cookie"] = "auth_token=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0";
-            
+
             return success({ message: "Account deleted successfully" });
           } catch (err) {
-            if ((err as Error).message === "Invalid password") {
+            const errorMessage = (err as Error).message;
+            if (errorMessage.includes("Invalid password") || errorMessage.includes("validation phrase")) {
               set.status = 401;
-              return error("Invalid password", 401);
+              return error(errorMessage, 401);
             }
             set.status = 500;
             return error("Failed to delete account", 500);
@@ -437,18 +438,19 @@ export function setupUserRoutes() {
         },
         {
           body: t.Object({
-            password: t.String(),
+            password: t.Optional(t.String()),
+            validationPhrase: t.Optional(t.String()),
           }),
           detail: {
             tags: ["Users"],
             summary: "Delete current user's account",
-            description: "Permanently delete the current user's account with password verification. All user data will be removed.",
+            description: "Permanently delete the current user's account with password verification (for regular users) or validation phrase (for OAuth users). All user data will be removed.",
             responses: {
               "200": {
                 description: "Account deleted successfully",
               },
               "401": {
-                description: "Invalid password or authentication required",
+                description: "Invalid password/validation phrase or authentication required",
               },
               "500": {
                 description: "Failed to delete account",

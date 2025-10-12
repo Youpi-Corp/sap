@@ -14,6 +14,8 @@ export interface User {
   biography: string | null;
   profile_picture: string | null;
   community_updates: boolean;
+  github_id: string | null;
+  google_id: string | null;
 }
 
 export interface NewUser {
@@ -24,6 +26,8 @@ export interface NewUser {
   biography?: string | null;
   profile_picture?: string | null;
   community_updates?: boolean;
+  github_id?: string | null;
+  google_id?: string | null;
 }
 
 export interface LoginRequest {
@@ -475,23 +479,89 @@ export class UserService {  /**
   }
 
   /**
-   * Delete user account with password verification
-   * Performs complete data deletion including all associations
-   * @param userId User ID
-   * @param password Password for verification
-   * @returns True if deletion was successful
+   * Find or create user by GitHub ID
+   * @param githubId GitHub user ID
+   * @param userData User data from GitHub
+   * @returns User
    */
-  async deleteUserAccount(userId: number, password: string): Promise<boolean> {
-    // Get user and verify password
-    const user = await this.getUserById(userId);
-    
-    if (!user.password_hash) {
-      throw new ApiError("Cannot verify account for deletion", 401);
+  async findOrCreateByGitHub(githubId: string, userData: NewUser): Promise<User> {
+    // Check if user exists with this GitHub ID
+    const existingUser = await db
+      .select()
+      .from(users)
+      .where(eq(users.github_id, githubId));
+
+    if (existingUser.length > 0) {
+      return existingUser[0];
     }
 
-    const isValid = await verifyPassword(password, user.password_hash);
-    if (!isValid) {
-      throw new ApiError("Invalid password", 401);
+    // Check if user exists with this email (link accounts)
+    if (userData.email) {
+      const userByEmail = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, userData.email));
+
+      if (userByEmail.length > 0) {
+        // Link GitHub account to existing user
+        const result = await db
+          .update(users)
+          .set({ github_id: githubId })
+          .where(eq(users.id, userByEmail[0].id))
+          .returning();
+
+        return result[0];
+      }
+    }
+
+    // Create new user with GitHub data
+    return await this.createUser({
+      ...userData,
+      github_id: githubId,
+    }, false);
+  }
+
+  /**
+   * Get user by GitHub ID
+   * @param githubId GitHub user ID
+   * @returns User or null
+   */
+  async getUserByGitHubId(githubId: string): Promise<User | null> {
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.github_id, githubId));
+
+    return result.length > 0 ? result[0] : null;
+  }
+
+  /**
+   * Delete user account with password or validation phrase verification
+   * Performs complete data deletion including all associations
+   * @param userId User ID
+   * @param password Password for verification (for non-OAuth users)
+   * @param validationPhrase Validation phrase for OAuth users (optional)
+   * @returns True if deletion was successful
+   */
+  async deleteUserAccount(userId: number, password: string, validationPhrase?: string): Promise<boolean> {
+    // Get user
+    const user = await this.getUserById(userId);
+
+    // Check if user is OAuth user (no password)
+    const isOAuthUser = !user.password_hash;
+
+    if (isOAuthUser) {
+      // For OAuth users, verify the validation phrase
+      const expectedPhrase = "delete my account";
+      if (!validationPhrase || validationPhrase.toLowerCase().trim() !== expectedPhrase) {
+        throw new ApiError("Invalid validation phrase. Please type 'delete my account' to confirm.", 401);
+      }
+    } else {
+      // For regular users, verify password
+      const isValid = await verifyPassword(password, user.password_hash!);
+      if (!isValid) {
+        throw new ApiError("Invalid password", 401);
+      }
     }
 
     // Send deletion confirmation email before deleting
@@ -514,10 +584,10 @@ export class UserService {  /**
     // - courseLikes (via onDelete: cascade)
     // - courseCompletions (via onDelete: cascade)
     // - moduleComments (via onDelete: cascade)
-    
+
     // Delete the user (cascades will handle the rest)
     const deleted = await this.deleteUser(userId);
-    
+
     return deleted;
   }
 }

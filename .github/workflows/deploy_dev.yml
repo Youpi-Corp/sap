@@ -76,6 +76,11 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           PORT: ${{ secrets.PORT }}
+          CLIENT_ID_GITHUB: ${{ secrets.CLIENT_ID_GITHUB }}
+          CLIENT_SECRET_GITHUB: ${{ secrets.CLIENT_SECRET_GITHUB }}
+          REDIRECT_URI_GITHUB: ${{ secrets.REDIRECT_URI_GITHUB }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
             set -e
@@ -86,6 +91,11 @@ jobs:
             export DATABASE_URL="${{ secrets.DATABASE_URL }}"
             export JWT_SECRET="${{ secrets.JWT_SECRET }}"
             export PORT="${{ secrets.PORT }}"
+            export CLIENT_ID_GITHUB="${{ secrets.CLIENT_ID_GITHUB }}"
+            export CLIENT_SECRET_GITHUB="${{ secrets.CLIENT_SECRET_GITHUB }}"
+            export REDIRECT_URI_GITHUB="${{ secrets.REDIRECT_URI_GITHUB }}"
+            export RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}"
+            export EMAIL_FROM="${{ secrets.EMAIL_FROM }}"
 
             echo "📦 Installing production dependencies..."
             bun install --production --frozen-lockfile
@@ -125,7 +135,10 @@ jobs:
             echo '      PORT: "${{ secrets.PORT }}",' >> ecosystem.config.cjs
             echo '      HOST: "0.0.0.0",' >> ecosystem.config.cjs
             echo '      DATABASE_URL: "${{ secrets.DATABASE_URL }}",' >> ecosystem.config.cjs
-            echo '      JWT_SECRET: "${{ secrets.JWT_SECRET }}"' >> ecosystem.config.cjs
+            echo '      JWT_SECRET: "${{ secrets.JWT_SECRET }}",' >> ecosystem.config.cjs
+            echo '      CLIENT_ID_GITHUB: "${{ secrets.CLIENT_ID_GITHUB }}",' >> ecosystem.config.cjs
+            echo '      CLIENT_SECRET_GITHUB: "${{ secrets.CLIENT_SECRET_GITHUB }}",' >> ecosystem.config.cjs
+            echo '      REDIRECT_URI_GITHUB: "${{ secrets.REDIRECT_URI_GITHUB }}"' >> ecosystem.config.cjs
             echo '    },' >> ecosystem.config.cjs
             echo '    max_restarts: 10,' >> ecosystem.config.cjs
             echo '    min_uptime: "10s",' >> ecosystem.config.cjs
