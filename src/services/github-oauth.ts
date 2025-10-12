@@ -132,8 +132,14 @@ export class GitHubOAuthService {
         return null;
       }
 
-      const emails = await response.json();
-      const primaryEmail = emails.find((e: any) => e.primary && e.verified);
+      interface GitHubEmail {
+        email: string;
+        primary: boolean;
+        verified: boolean;
+        visibility?: string;
+      }
+      const emails: GitHubEmail[] = await response.json();
+      const primaryEmail = emails.find((e) => e.primary && e.verified);
 
       return primaryEmail?.email || null;
     } catch (error) {
