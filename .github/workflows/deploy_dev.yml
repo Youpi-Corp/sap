@@ -79,6 +79,8 @@ jobs:
           CLIENT_ID_GITHUB: ${{ secrets.CLIENT_ID_GITHUB }}
           CLIENT_SECRET_GITHUB: ${{ secrets.CLIENT_SECRET_GITHUB }}
           REDIRECT_URI_GITHUB: ${{ secrets.REDIRECT_URI_GITHUB }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
             set -e
@@ -92,6 +94,8 @@ jobs:
             export CLIENT_ID_GITHUB="${{ secrets.CLIENT_ID_GITHUB }}"
             export CLIENT_SECRET_GITHUB="${{ secrets.CLIENT_SECRET_GITHUB }}"
             export REDIRECT_URI_GITHUB="${{ secrets.REDIRECT_URI_GITHUB }}"
+            export RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}"
+            export EMAIL_FROM="${{ secrets.EMAIL_FROM }}"
 
             echo "📦 Installing production dependencies..."
             bun install --production --frozen-lockfile
