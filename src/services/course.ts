@@ -15,6 +15,8 @@ export interface Course {
   public: boolean | null;
   chat_id: number | null;
   owner_id: number | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface NewCourse {
@@ -58,7 +60,12 @@ export class CourseService {
    */
   async createCourse(courseData: NewCourse): Promise<Course> {
     console.log("Creating course with data:", courseData);
-    const result = await db.insert(courses).values(courseData).returning();
+    const now = new Date().toISOString();
+    const result = await db.insert(courses).values({
+      ...courseData,
+      created_at: now,
+      updated_at: now
+    }).returning();
     return result[0];
   }
 
@@ -71,7 +78,10 @@ export class CourseService {
   async updateCourse(id: number, courseData: Partial<NewCourse>): Promise<Course> {
     const result = await db
       .update(courses)
-      .set(courseData)
+      .set({
+        ...courseData,
+        updated_at: new Date().toISOString()
+      })
       .where(eq(courses.id, id))
       .returning();
 

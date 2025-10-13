@@ -22,7 +22,16 @@ export function setupCourseRoutes() {
 
         // Get courses based on user's roles and permissions
         const courses = await courseService.getCoursesByUserAccess(userId, userRoles);
-        return success(courses);
+        
+        // Fix created_at and updated_at if they are 'NOW()' string or missing
+        const now = new Date().toISOString();
+        const fixedCourses = courses.map(course => ({
+          ...course,
+          created_at: course.created_at === 'NOW()' || !course.created_at ? now : course.created_at,
+          updated_at: course.updated_at === 'NOW()' || !course.updated_at ? now : course.updated_at,
+        }));
+        
+        return success(fixedCourses);
       }, {
       detail: {
         tags: ["Courses"],

@@ -26,6 +26,7 @@
     "migrate:multi-roles": "bun run src/db/roles-migration.ts",
     "create:admin": "bun run src/scripts/create-admin.ts",
     "init:roles": "bun run src/scripts/init-roles.ts",
+    "test:email": "bun run src/scripts/test-email.ts",
     "lint": "eslint . --ext .ts",
     "test:watch": "vitest"
   },
@@ -37,7 +38,7 @@
     "@elysiajs/swagger": "1.3.0",
     "bcryptjs": "3.0.2",
     "dotenv": "16.5.0",
-    "drizzle-kit": "^0.31.1",
+    "drizzle-kit": "^0.31.5",
     "drizzle-orm": "0.43.1",
     "elysia": "^1.3.1",
     "pg": "^8.16.0",

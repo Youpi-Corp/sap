@@ -78,6 +78,34 @@
       "when": 1749277532826,
       "tag": "0010_nosy_silver_centurion",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1760213543149,
+      "tag": "0011_nappy_sprite",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1760216632014,
+      "tag": "0012_freezing_mole_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1760281111104,
+      "tag": "0013_orange_human_fly",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1760359319301,
+      "tag": "0014_clammy_maddog",
+      "breakpoints": true
     }
   ]
 }

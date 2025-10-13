@@ -15,6 +15,11 @@ export const users = pgTable("user", {
   password_hash: text("password_hash"),
   biography: text("biography"),
   profile_picture: text("profile_picture"),
+  community_updates: boolean("community_updates").notNull().default(false), // User preference for community updates
+  github_id: varchar("github_id", { length: 100 }), // GitHub user ID for OAuth
+  google_id: varchar("google_id", { length: 100 }), // Google user ID for OAuth (future use)
+  created_at: text("created_at").notNull().default("NOW()"), // Timestamp when user was created
+  updated_at: text("updated_at").notNull().default("NOW()"), // Timestamp when user was last updated
 });
 
 // Role definitions table
@@ -73,6 +78,8 @@ export const courses = pgTable("course", {
   public: boolean("public"),
   chat_id: integer("chat_id").references(() => chats.id),
   owner_id: integer("owner_id").references(() => users.id), // Changed user_id to owner_id
+  created_at: text("created_at").notNull().default("NOW()"), // Timestamp when course was created
+  updated_at: text("updated_at").notNull().default("NOW()"), // Timestamp when course was last updated
 });
 
 // Subscription table
@@ -122,4 +129,14 @@ export const courseCompletions = pgTable("course_completion", {
   user_id: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   course_id: integer("course_id").notNull().references(() => courses.id, { onDelete: "cascade" }),
   completed_at: text("completed_at").notNull().default("NOW()"),
+});
+
+// Module comments table
+export const moduleComments = pgTable("module_comment", {
+  id: serial("id").primaryKey(),
+  content: text("content").notNull(),
+  user_id: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  module_id: integer("module_id").notNull().references(() => modules.id, { onDelete: "cascade" }),
+  created_at: text("created_at").notNull().default("NOW()"),
+  updated_at: text("updated_at").notNull().default("NOW()"),
 });

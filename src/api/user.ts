@@ -206,13 +206,21 @@ export function setupUserRoutes() {
           const safeUsers = await Promise.all(users.map(async user => {
             const { password_hash, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars
 
+            // Fix created_at and updated_at if they are 'NOW()' string or missing
+            const now = new Date().toISOString();
+            const fixedUserData = {
+              ...userData,
+              created_at: userData.created_at === 'NOW()' || !userData.created_at ? now : userData.created_at,
+              updated_at: userData.updated_at === 'NOW()' || !userData.updated_at ? now : userData.updated_at,
+            };
+
             // Get user's roles
             try {
               const roles = await roleService.getUserRoleNames(user.id);
-              return { ...userData, roles };
+              return { ...fixedUserData, roles };
             } catch (err) {
               console.error(`Error fetching roles for user ${user.id}:`, err);
-              return { ...userData, roles: [] };
+              return { ...fixedUserData, roles: [] };
             }
           }));
 
@@ -373,6 +381,136 @@ export function setupUserRoutes() {
               },
               "404": {
                 description: "User not found",
+              },
+            },
+          },
+        }
+      )
+
+      // Export user data (self-export for transparency/GDPR)
+      .get("/export-data/me",
+        async ({ requireAuth, set }) => {
+          const claims = await requireAuth();
+          const currentUserId = parseInt(claims.sub);
+
+          try {
+            const exportData = await userService.exportUserData(currentUserId);
+            return success(exportData);
+          } catch {
+            set.status = 500;
+            return error("Failed to export user data", 500);
+          }
+        },
+        {
+          detail: {
+            tags: ["Users"],
+            summary: "Export current user's data",
+            description: "Export all data associated with the current user for transparency/GDPR compliance",
+            responses: {
+              "200": {
+                description: "User data exported successfully",
+              },
+              "401": {
+                description: "Authentication required",
+              },
+              "500": {
+                description: "Failed to export data",
+              },
+            },
+          },
+        }
+      )
+
+      // Delete user account (self-deletion with password or validation phrase verification)
+      .delete("/delete/me",
+        async ({ body, requireAuth, set }) => {
+          const claims = await requireAuth();
+          const currentUserId = parseInt(claims.sub);
+
+          try {
+            await userService.deleteUserAccount(currentUserId, body.password || "", body.validationPhrase);
+
+            // Clear the auth cookie after successful deletion
+            set.headers["Set-Cookie"] = "auth_token=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0";
+
+            return success({ message: "Account deleted successfully" });
+          } catch (err) {
+            const errorMessage = (err as Error).message;
+            if (errorMessage.includes("Invalid password") || errorMessage.includes("validation phrase")) {
+              set.status = 401;
+              return error(errorMessage, 401);
+            }
+            set.status = 500;
+            return error("Failed to delete account", 500);
+          }
+        },
+        {
+          body: t.Object({
+            password: t.Optional(t.String()),
+            validationPhrase: t.Optional(t.String()),
+          }),
+          detail: {
+            tags: ["Users"],
+            summary: "Delete current user's account",
+            description: "Permanently delete the current user's account with password verification (for regular users) or validation phrase (for OAuth users). All user data will be removed.",
+            responses: {
+              "200": {
+                description: "Account deleted successfully",
+              },
+              "401": {
+                description: "Invalid password/validation phrase or authentication required",
+              },
+              "500": {
+                description: "Failed to delete account",
+              },
+            },
+          },
+        }
+      )
+
+      // Update privacy settings
+      .put("/privacy-settings",
+        async ({ body, requireAuth, set }) => {
+          const claims = await requireAuth();
+          const currentUserId = parseInt(claims.sub);
+
+          try {
+            const updatedUser = await userService.updateUser(
+              currentUserId,
+              { community_updates: body.community_updates },
+              false
+            );
+
+            // Remove sensitive data
+            const { password_hash, ...userData } = updatedUser;
+
+            // Get user's roles
+            const { roleService } = await import("../services/role");
+            const userRoles = await roleService.getUserRoleNames(currentUserId);
+
+            return success({ ...userData, roles: userRoles });
+          } catch {
+            set.status = 500;
+            return error("Failed to update privacy settings", 500);
+          }
+        },
+        {
+          body: t.Object({
+            community_updates: t.Boolean(),
+          }),
+          detail: {
+            tags: ["Users"],
+            summary: "Update privacy settings",
+            description: "Update the current user's privacy preferences",
+            responses: {
+              "200": {
+                description: "Privacy settings updated successfully",
+              },
+              "401": {
+                description: "Authentication required",
+              },
+              "500": {
+                description: "Failed to update settings",
               },
             },
           },

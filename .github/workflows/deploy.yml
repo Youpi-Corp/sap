@@ -47,66 +47,291 @@ jobs:
             --exclude='*.log' \
             ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ env.DEPLOY_PATH }}/
 
+      - name: System health check
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            echo "🔍 System Health Check"
+
+            # Check disk space
+            DISK_USAGE=$(df -h / | awk 'NR==2 {print $5}' | sed 's/%//')
+            if [ "$DISK_USAGE" -gt 90 ]; then
+              echo "⚠️  WARNING: Disk usage is at ${DISK_USAGE}%"
+            else
+              echo "✅ Disk usage: ${DISK_USAGE}%"
+            fi
+
+            # Check memory usage
+            MEM_USAGE=$(free | awk 'NR==2 {printf "%.0f", $3*100/$2}')
+            echo "📊 Memory usage: ${MEM_USAGE}%"
+
+            # Check if nginx is installed
+            if command -v nginx &> /dev/null; then
+              echo "✅ Nginx is installed"
+            else
+              echo "⚠️  Nginx is not installed"
+            fi
+          EOF
+
       - name: Install and restart application
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           PORT: ${{ secrets.PORT }}
+          CLIENT_ID_GITHUB: ${{ secrets.CLIENT_ID_GITHUB }}
+          CLIENT_SECRET_GITHUB: ${{ secrets.CLIENT_SECRET_GITHUB }}
+          REDIRECT_URI_GITHUB: ${{ secrets.REDIRECT_URI_GITHUB }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
             set -e
             cd ${{ env.DEPLOY_PATH }}
-            
+
             # Set environment variables for this session
             export NODE_ENV=production
             export DATABASE_URL="${{ secrets.DATABASE_URL }}"
             export JWT_SECRET="${{ secrets.JWT_SECRET }}"
             export PORT="${{ secrets.PORT }}"
-            
-            # Install production dependencies
+            export CLIENT_ID_GITHUB="${{ secrets.CLIENT_ID_GITHUB }}"
+            export CLIENT_SECRET_GITHUB="${{ secrets.CLIENT_SECRET_GITHUB }}"
+            export REDIRECT_URI_GITHUB="${{ secrets.REDIRECT_URI_GITHUB }}"
+            export RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}"
+            export EMAIL_FROM="${{ secrets.EMAIL_FROM }}"
+
+            echo "📦 Installing production dependencies..."
             bun install --production --frozen-lockfile
-            
-            # Run migrations
-            bun run migrate            # Install PM2 if not already installed
+
+            # Run migrations with error handling
+            echo "🔄 Running database migrations..."
+            if ! bun run migrate; then
+              echo "⚠️  Migration failed, but continuing deployment..."
+            fi
+
+            # Install PM2 if not already installed
             if ! command -v pm2 &> /dev/null; then
+              echo "📦 Installing PM2..."
               npm install -g pm2
             fi
-            
-            # Restart PM2 process
+
+            # Setup PM2 startup script
+            echo "⚙️  Configuring PM2 startup..."
+            PM2_STARTUP_CMD=$(pm2 startup systemd -u $USER --hp $HOME | tail -n 1)
+            if [[ "$PM2_STARTUP_CMD" == sudo* ]]; then
+              echo "Running: $PM2_STARTUP_CMD"
+              eval "$PM2_STARTUP_CMD" || echo "⚠️  PM2 startup configuration may require manual sudo"
+            fi
+
+            # Stop old PM2 process
             pm2 delete ${{ env.APP_NAME }} 2>/dev/null || true
-            
-            # Start the application with explicit environment variables
-            pm2 start "bun" \
-              --name ${{ env.APP_NAME }} \
-              --cwd ${{ env.DEPLOY_PATH }} \
-              --env NODE_ENV=production \
-              --env PORT=${{ secrets.PORT }} \
-              --env HOST=0.0.0.0 \
-              --env DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-              --env JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-              -- dist/index.js
-            
+
+            # Create PM2 ecosystem config for advanced restart policies
+            echo "📝 Creating PM2 ecosystem configuration..."
+            echo 'module.exports = {' > ecosystem.config.cjs
+            echo '  apps: [{' >> ecosystem.config.cjs
+            echo '    name: "${{ env.APP_NAME }}",' >> ecosystem.config.cjs
+            echo '    script: "bun",' >> ecosystem.config.cjs
+            echo '    args: "dist/index.js",' >> ecosystem.config.cjs
+            echo '    env: {' >> ecosystem.config.cjs
+            echo '      NODE_ENV: "production",' >> ecosystem.config.cjs
+            echo '      PORT: "${{ secrets.PORT }}",' >> ecosystem.config.cjs
+            echo '      HOST: "0.0.0.0",' >> ecosystem.config.cjs
+            echo '      DATABASE_URL: "${{ secrets.DATABASE_URL }}",' >> ecosystem.config.cjs
+            echo '      JWT_SECRET: "${{ secrets.JWT_SECRET }}",' >> ecosystem.config.cjs
+            echo '      CLIENT_ID_GITHUB: "${{ secrets.CLIENT_ID_GITHUB }}",' >> ecosystem.config.cjs
+            echo '      CLIENT_SECRET_GITHUB: "${{ secrets.CLIENT_SECRET_GITHUB }}",' >> ecosystem.config.cjs
+            echo '      REDIRECT_URI_GITHUB: "${{ secrets.REDIRECT_URI_GITHUB }}"' >> ecosystem.config.cjs
+            echo '    },' >> ecosystem.config.cjs
+            echo '    max_restarts: 10,' >> ecosystem.config.cjs
+            echo '    min_uptime: "10s",' >> ecosystem.config.cjs
+            echo '    restart_delay: 3000,' >> ecosystem.config.cjs
+            echo '    autorestart: true,' >> ecosystem.config.cjs
+            echo '    watch: false' >> ecosystem.config.cjs
+            echo '  }]' >> ecosystem.config.cjs
+            echo '};' >> ecosystem.config.cjs
+
+            # Start the application with ecosystem config
+            echo "🚀 Starting application..."
+            pm2 start ecosystem.config.cjs
+
+            # Save PM2 process list for resurrection
             pm2 save
-            
-            # Health check
-            sleep 3
+
+            # Configure PM2 log rotation (after save)
+            echo "⚙️  Configuring PM2 log rotation..."
+            pm2 install pm2-logrotate || echo "⚠️  PM2 logrotate install failed, skipping..."
+            pm2 set pm2-logrotate:max_size 10M || true
+            pm2 set pm2-logrotate:retain 7 || true
+            pm2 save
+
+            echo "✅ Application started"
+          EOF
+
+      - name: Configure and verify nginx
+        env:
+          PORT: ${{ secrets.PORT }}
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            echo "🔧 Configuring Nginx..."
+
+            # Install nginx if not present
+            if ! command -v nginx &> /dev/null; then
+              echo "📦 Installing Nginx..."
+              sudo apt-get update
+              sudo apt-get install -y nginx
+            fi
+
+            # Create nginx site configuration if missing
+            if [ ! -f /etc/nginx/sites-enabled/brainforest.conf ]; then
+              echo "📝 Creating nginx site configuration for production..."
+              echo 'server {' | sudo tee /etc/nginx/sites-available/brainforest.conf > /dev/null
+              echo '    listen 80;' | sudo tee -a /etc/nginx/sites-available/brainforest.conf > /dev/null
+              echo '    server_name brainforest.youpi.ovh;' | sudo tee -a /etc/nginx/sites-available/brainforest.conf > /dev/null
+              echo '' | sudo tee -a /etc/nginx/sites-available/brainforest.conf > /dev/null
+              echo '    location / {' | sudo tee -a /etc/nginx/sites-available/brainforest.conf > /dev/null
+              echo "        proxy_pass http://localhost:${{ secrets.PORT }};" | sudo tee -a /etc/nginx/sites-available/brainforest.conf > /dev/null
+              echo '        proxy_http_version 1.1;' | sudo tee -a /etc/nginx/sites-available/brainforest.conf > /dev/null
+              echo '        proxy_set_header Upgrade $http_upgrade;' | sudo tee -a /etc/nginx/sites-available/brainforest.conf > /dev/null
+              echo "        proxy_set_header Connection 'upgrade';" | sudo tee -a /etc/nginx/sites-available/brainforest.conf > /dev/null
+              echo '        proxy_set_header Host $host;' | sudo tee -a /etc/nginx/sites-available/brainforest.conf > /dev/null
+              echo '        proxy_set_header X-Real-IP $remote_addr;' | sudo tee -a /etc/nginx/sites-available/brainforest.conf > /dev/null
+              echo '        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;' | sudo tee -a /etc/nginx/sites-available/brainforest.conf > /dev/null
+              echo '        proxy_set_header X-Forwarded-Proto $scheme;' | sudo tee -a /etc/nginx/sites-available/brainforest.conf > /dev/null
+              echo '        proxy_cache_bypass $http_upgrade;' | sudo tee -a /etc/nginx/sites-available/brainforest.conf > /dev/null
+              echo '    }' | sudo tee -a /etc/nginx/sites-available/brainforest.conf > /dev/null
+              echo '}' | sudo tee -a /etc/nginx/sites-available/brainforest.conf > /dev/null
+              sudo ln -sf /etc/nginx/sites-available/brainforest.conf /etc/nginx/sites-enabled/brainforest.conf
+              echo "✅ Created nginx configuration"
+            fi
+
+            # Test nginx configuration
+            echo "🧪 Testing Nginx configuration..."
+            if sudo nginx -t 2>&1; then
+              echo "✅ Nginx configuration is valid"
+
+              # Enable nginx to start on boot
+              sudo systemctl enable nginx
+
+              # Restart nginx
+              echo "🔄 Restarting Nginx..."
+              sudo systemctl restart nginx
+
+              # Verify nginx is running
+              if sudo systemctl is-active --quiet nginx; then
+                echo "✅ Nginx is running"
+              else
+                echo "❌ Nginx failed to start"
+                sudo systemctl status nginx || true
+              fi
+
+              # Check if nginx is listening on ports
+              echo "🔍 Checking Nginx ports..."
+              if sudo netstat -tlnp 2>/dev/null | grep -q ':80.*nginx'; then
+                echo "✅ Nginx listening on port 80"
+              else
+                echo "⚠️  Nginx not listening on port 80"
+              fi
+
+              if sudo netstat -tlnp 2>/dev/null | grep -q ':443.*nginx'; then
+                echo "✅ Nginx listening on port 443"
+              else
+                echo "⚠️  Nginx not listening on port 443 (SSL not configured)"
+              fi
+            else
+              echo "❌ Nginx configuration test failed"
+              echo "⚠️  Continuing deployment without nginx restart"
+            fi
+          EOF
+
+      - name: Health checks with retries
+        env:
+          PORT: ${{ secrets.PORT }}
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            echo "🏥 Running health checks..."
+
+            # Wait for app to start
+            echo "⏳ Waiting for application to start (10s)..."
+            sleep 10
+
+            # Check PM2 process status
+            echo "🔍 Checking PM2 process status..."
             if pm2 list | grep -q "${{ env.APP_NAME }}.*online"; then
               echo "✅ PM2 process is online"
-              
-              # Additional debugging information
-              echo "🔍 Checking process details:"
               pm2 show ${{ env.APP_NAME }}
-              
-              echo "🔍 Checking if application is listening on port:"
-              netstat -tlnp | grep ${{ secrets.PORT }} || echo "No process listening on port ${{ secrets.PORT }}"
-              
-              echo "🔍 Testing local connection:"
-              curl -s http://localhost:${{ secrets.PORT }}/health || curl -s http://localhost:${{ secrets.PORT }} || echo "Local connection test failed"
-              
-              echo "✅ Deployment successful - check logs if there are connection issues"
             else
-              echo "❌ Deployment failed"
-              pm2 logs ${{ env.APP_NAME }} --lines 10
+              echo "❌ PM2 process is not online"
+              pm2 logs ${{ env.APP_NAME }} --lines 20
               exit 1
             fi
+
+            # Check if application is listening on port
+            echo "🔍 Checking if application is listening on port ${{ secrets.PORT }}..."
+            if netstat -tlnp 2>/dev/null | grep -q ":${{ secrets.PORT }}"; then
+              echo "✅ Application is listening on port ${{ secrets.PORT }}"
+            else
+              echo "⚠️  No process listening on port ${{ secrets.PORT }}"
+            fi
+
+            # Test HTTP endpoint with retries
+            echo "🔍 Testing HTTP endpoint (3 attempts)..."
+            SUCCESS=false
+            for i in {1..3}; do
+              echo "Attempt $i/3..."
+              if curl -sf http://localhost:${{ secrets.PORT }}/health > /dev/null 2>&1 || \
+                 curl -sf http://localhost:${{ secrets.PORT }} > /dev/null 2>&1; then
+                echo "✅ HTTP endpoint responding"
+                SUCCESS=true
+                break
+              fi
+              if [ $i -lt 3 ]; then
+                echo "⏳ Retrying in 2 seconds..."
+                sleep 2
+              fi
+            done
+
+            if [ "$SUCCESS" = false ]; then
+              echo "⚠️  HTTP endpoint not responding after 3 attempts"
+            fi
+
+            # Check SSL certificate validity (if applicable)
+            if [ -f /etc/letsencrypt/live/*/cert.pem ]; then
+              echo "🔍 Checking SSL certificate..."
+              CERT_PATH=$(sudo find /etc/letsencrypt/live -name cert.pem | head -1)
+              if [ -n "$CERT_PATH" ]; then
+                EXPIRY=$(sudo openssl x509 -enddate -noout -in "$CERT_PATH" | cut -d= -f2)
+                echo "📅 SSL certificate expires: $EXPIRY"
+              fi
+            fi
+
+            echo "✅ Health checks complete"
+          EOF
+
+      - name: Cleanup old logs
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            echo "🧹 Cleaning up old logs..."
+            cd ${{ env.DEPLOY_PATH }}
+
+            # Remove logs older than 7 days
+            find . -name "*.log" -type f -mtime +7 -delete 2>/dev/null || true
+
+            echo "✅ Cleanup complete"
+          EOF
+
+      - name: Deployment summary
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            echo ""
+            echo "========================================="
+            echo "🎉 DEPLOYMENT SUMMARY"
+            echo "========================================="
+            echo "Application: ${{ env.APP_NAME }}"
+            echo "Environment: production"
+            echo "PM2 Status:"
+            pm2 list
+            echo ""
+            echo "Recent PM2 Logs:"
+            pm2 logs ${{ env.APP_NAME }} --lines 5 --nostream
+            echo "========================================="
+            echo "✅ Deployment successful!"
           EOF

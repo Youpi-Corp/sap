@@ -36,6 +36,8 @@ const app = new Elysia()
           { name: "Info", description: "Info endpoints" },
           { name: "System", description: "System health endpoints" },
           { name: "Courses", description: "Course management endpoints" },
+          { name: "Modules", description: "Module management endpoints" },
+          { name: "Module Comments", description: "Module comment endpoints" },
         ],
       },
     }))  // Puis ajoutez les autres middlewares
