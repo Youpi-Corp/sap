@@ -293,7 +293,7 @@ The API features comprehensive interactive documentation built with Swagger/Open
 
 ### Module Management (`/module`)
 
-- `GET /module/list` - List all modules (filtered by permissions)
+- `GET /module/list` - List modules (admins see all, users see public only)
 - `GET /module/public` - Get public modules (no authentication required)
 - `GET /module/get/:moduleId` - Get module details by ID
 - `GET /module/owner/:ownerId` - Get modules by owner
