@@ -20,9 +20,15 @@ export function setupModuleRoutes() {
         "/list",
         async ({ requireAuth }) => {
           // Require authentication
-          await requireAuth();
+          const claims = await requireAuth();
+          const userRoles = claims.roles || [];
+          const isAdmin = userRoles.includes(ROLES.ADMIN);
 
-          const modules = await moduleService.getAllModules();
+          // Admins see all modules, regular users see only public modules
+          const modules = isAdmin 
+            ? await moduleService.getAllModulesIncludingPrivate()
+            : await moduleService.getAllModules();
+          
           // Map dtc and dtm to created_at and updated_at for frontend compatibility
           const mappedModules = modules.map(module => ({
             ...module,
@@ -35,7 +41,7 @@ export function setupModuleRoutes() {
           detail: {
             tags: ["Modules"],
             summary: "List all modules",
-            description: "Retrieve a list of all modules",
+            description: "Retrieve a list of modules. Admins see all modules (public and private), regular users see only public modules.",
             responses: {
               "200": {
                 description: "List of modules retrieved successfully",

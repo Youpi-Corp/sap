@@ -345,7 +345,7 @@ Base path: `/module`
 
 ### GET /module/list
 
-**Description**: Retrieve a list of all modules
+**Description**: Retrieve a list of modules. Admins see all modules (public and private), regular users see only public modules (requires authentication)
 
 **Responses**:
 

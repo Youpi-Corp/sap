@@ -66,9 +66,29 @@ export class ModuleService {  /**
     return moduleWithCourses;
   }
   /**
-   * Get all modules
-   * @returns Array of modules
+   * Get all modules (public only)
+   * @returns Array of public modules
    */  async getAllModules(): Promise<Module[]> {
+    const allModules = await db
+      .select()
+      .from(modules)
+      .where(eq(modules.public, true));
+
+    // Ensure public is boolean for all modules
+    const modulesWithBoolean = allModules.map(module => this.ensurePublicIsBoolean(module));
+
+    // Add courses to each module
+    const modulesWithCourses = await Promise.all(
+      modulesWithBoolean.map(module => this.addCoursesToModule(module))
+    );
+    return modulesWithCourses;
+  }
+
+  /**
+   * Get all modules including private ones (for admins)
+   * @returns Array of all modules
+   */
+  async getAllModulesIncludingPrivate(): Promise<Module[]> {
     const allModules = await db.select().from(modules);
 
     // Ensure public is boolean for all modules
@@ -244,6 +264,8 @@ export class ModuleService {  /**
         public: courses.public,
         chat_id: courses.chat_id,
         owner_id: courses.owner_id,
+        created_at: courses.created_at,
+        updated_at: courses.updated_at,
       })
       .from(courses)
       .where(eq(courses.module_id, moduleId));
