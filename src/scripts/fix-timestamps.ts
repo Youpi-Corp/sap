@@ -5,7 +5,7 @@
 
 import { db } from "../db/client";
 import { users, courses } from "../db/schema";
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 async function fixTimestamps() {
   console.log("Starting timestamp fix...");
