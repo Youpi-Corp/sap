@@ -16,6 +16,8 @@ export interface User {
   community_updates: boolean;
   github_id: string | null;
   google_id: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface NewUser {
@@ -96,6 +98,11 @@ export class UserService {  /**
       const userRecord = userToInsert as Partial<User & { password_hash?: string | null } & { password?: string }>;
       delete userRecord.password;
     }
+
+    // Add timestamps
+    const now = new Date().toISOString();
+    userToInsert.created_at = now;
+    userToInsert.updated_at = now;
 
     // Remove roles from insert data (will be handled separately)
     const userRoles = userData.roles || [];
@@ -208,6 +215,9 @@ export class UserService {  /**
       const userRecord = userToUpdate as Partial<User & { password_hash?: string | null } & { password?: string }>;
       delete userRecord.password;
     }
+
+    // Update timestamp
+    userToUpdate.updated_at = new Date().toISOString();
 
     // Update user
     const result = await db

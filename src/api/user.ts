@@ -206,13 +206,21 @@ export function setupUserRoutes() {
           const safeUsers = await Promise.all(users.map(async user => {
             const { password_hash, ...userData } = user; // ESLint: disable-line @typescript-eslint/no-unused-vars
 
+            // Fix created_at and updated_at if they are 'NOW()' string or missing
+            const now = new Date().toISOString();
+            const fixedUserData = {
+              ...userData,
+              created_at: userData.created_at === 'NOW()' || !userData.created_at ? now : userData.created_at,
+              updated_at: userData.updated_at === 'NOW()' || !userData.updated_at ? now : userData.updated_at,
+            };
+
             // Get user's roles
             try {
               const roles = await roleService.getUserRoleNames(user.id);
-              return { ...userData, roles };
+              return { ...fixedUserData, roles };
             } catch (err) {
               console.error(`Error fetching roles for user ${user.id}:`, err);
-              return { ...userData, roles: [] };
+              return { ...fixedUserData, roles: [] };
             }
           }));
 

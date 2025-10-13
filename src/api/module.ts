@@ -23,7 +23,13 @@ export function setupModuleRoutes() {
           await requireAuth();
 
           const modules = await moduleService.getAllModules();
-          return success(modules);
+          // Map dtc and dtm to created_at and updated_at for frontend compatibility
+          const mappedModules = modules.map(module => ({
+            ...module,
+            created_at: module.dtc,
+            updated_at: module.dtm
+          }));
+          return success(mappedModules);
         },
         {
           detail: {

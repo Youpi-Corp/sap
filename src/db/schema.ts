@@ -18,6 +18,8 @@ export const users = pgTable("user", {
   community_updates: boolean("community_updates").notNull().default(false), // User preference for community updates
   github_id: varchar("github_id", { length: 100 }), // GitHub user ID for OAuth
   google_id: varchar("google_id", { length: 100 }), // Google user ID for OAuth (future use)
+  created_at: text("created_at").notNull().default("NOW()"), // Timestamp when user was created
+  updated_at: text("updated_at").notNull().default("NOW()"), // Timestamp when user was last updated
 });
 
 // Role definitions table
@@ -76,6 +78,8 @@ export const courses = pgTable("course", {
   public: boolean("public"),
   chat_id: integer("chat_id").references(() => chats.id),
   owner_id: integer("owner_id").references(() => users.id), // Changed user_id to owner_id
+  created_at: text("created_at").notNull().default("NOW()"), // Timestamp when course was created
+  updated_at: text("updated_at").notNull().default("NOW()"), // Timestamp when course was last updated
 });
 
 // Subscription table
