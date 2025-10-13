@@ -394,11 +394,14 @@ export function setupUserRoutes() {
           const currentUserId = parseInt(claims.sub);
 
           try {
+            console.log(`[export-data] Starting data export for user ${currentUserId}`);
             const exportData = await userService.exportUserData(currentUserId);
+            console.log(`[export-data] Successfully exported data for user ${currentUserId}`);
             return success(exportData);
-          } catch {
+          } catch (err) {
+            console.error(`[export-data] Error exporting data for user ${currentUserId}:`, err);
             set.status = 500;
-            return error("Failed to export user data", 500);
+            return error(`Failed to export user data: ${(err as Error).message}`, 500);
           }
         },
         {
