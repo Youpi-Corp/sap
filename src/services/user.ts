@@ -387,105 +387,109 @@ export class UserService {  /**
    * @returns Complete user data export
    */
   async exportUserData(userId: number): Promise<UserDataExport> {
-    const user = await this.getUserById(userId);
-    
-    // Get user roles
-    const { roleService } = await import("./role");
-    const userRoles = await roleService.getUserRoleNames(userId);
+    try {
+      const user = await this.getUserById(userId);
+      
+      // Get user roles
+      const { roleService } = await import("./role");
+      const userRoles = await roleService.getUserRoleNames(userId);
 
-    // Get module subscriptions
-    const { moduleSubscriptions, modules } = await import("../db/schema");
-    const subscriptions = await db
-      .select({
-        module_id: moduleSubscriptions.module_id,
-        subscribed_at: moduleSubscriptions.subscribed_at,
-        module_title: modules.title,
-        module_description: modules.description,
-      })
-      .from(moduleSubscriptions)
-      .leftJoin(modules, eq(moduleSubscriptions.module_id, modules.id))
-      .where(eq(moduleSubscriptions.user_id, userId));
+      // Import all schema types once
+      const { moduleSubscriptions, modules, courseLikes, courseCompletions, moduleComments, courses } = await import("../db/schema");
 
-    // Get course likes
-    const { courseLikes, courses } = await import("../db/schema");
-    const likes = await db
-      .select({
-        course_id: courseLikes.course_id,
-        liked_at: courseLikes.liked_at,
-        course_name: courses.name,
-      })
-      .from(courseLikes)
-      .leftJoin(courses, eq(courseLikes.course_id, courses.id))
-      .where(eq(courseLikes.user_id, userId));
+      // Get module subscriptions
+      const subscriptions = await db
+        .select({
+          module_id: moduleSubscriptions.module_id,
+          subscribed_at: moduleSubscriptions.subscribed_at,
+          module_title: modules.title,
+          module_description: modules.description,
+        })
+        .from(moduleSubscriptions)
+        .leftJoin(modules, eq(moduleSubscriptions.module_id, modules.id))
+        .where(eq(moduleSubscriptions.user_id, userId));
 
-    // Get course completions
-    const { courseCompletions } = await import("../db/schema");
-    const completions = await db
-      .select({
-        course_id: courseCompletions.course_id,
-        completed_at: courseCompletions.completed_at,
-        course_name: courses.name,
-      })
-      .from(courseCompletions)
-      .leftJoin(courses, eq(courseCompletions.course_id, courses.id))
-      .where(eq(courseCompletions.user_id, userId));
+      // Get course likes
+      const likes = await db
+        .select({
+          course_id: courseLikes.course_id,
+          liked_at: courseLikes.liked_at,
+          course_name: courses.name,
+        })
+        .from(courseLikes)
+        .leftJoin(courses, eq(courseLikes.course_id, courses.id))
+        .where(eq(courseLikes.user_id, userId));
 
-    // Get module comments
-    const { moduleComments } = await import("../db/schema");
-    const comments = await db
-      .select({
-        id: moduleComments.id,
-        content: moduleComments.content,
-        module_id: moduleComments.module_id,
-        module_title: modules.title,
-        created_at: moduleComments.created_at,
-        updated_at: moduleComments.updated_at,
-      })
-      .from(moduleComments)
-      .leftJoin(modules, eq(moduleComments.module_id, modules.id))
-      .where(eq(moduleComments.user_id, userId));
+      // Get course completions
+      const completions = await db
+        .select({
+          course_id: courseCompletions.course_id,
+          completed_at: courseCompletions.completed_at,
+          course_name: courses.name,
+        })
+        .from(courseCompletions)
+        .leftJoin(courses, eq(courseCompletions.course_id, courses.id))
+        .where(eq(courseCompletions.user_id, userId));
 
-    // Get owned modules
-    const ownedModules = await db
-      .select()
-      .from(modules)
-      .where(eq(modules.owner_id, userId));
+      // Get module comments
+      const comments = await db
+        .select({
+          id: moduleComments.id,
+          content: moduleComments.content,
+          module_id: moduleComments.module_id,
+          module_title: modules.title,
+          created_at: moduleComments.created_at,
+          updated_at: moduleComments.updated_at,
+        })
+        .from(moduleComments)
+        .leftJoin(modules, eq(moduleComments.module_id, modules.id))
+        .where(eq(moduleComments.user_id, userId));
 
-    // Get owned courses
-    const ownedCourses = await db
-      .select()
-      .from(courses)
-      .where(eq(courses.owner_id, userId));
+      // Get owned modules
+      const ownedModules = await db
+        .select()
+        .from(modules)
+        .where(eq(modules.owner_id, userId));
 
-    // Remove sensitive data
-    const { password_hash, ...userData } = user;
+      // Get owned courses
+      const ownedCourses = await db
+        .select()
+        .from(courses)
+        .where(eq(courses.owner_id, userId));
 
-    // Compile complete data export
-    return {
-      export_date: new Date().toISOString(),
-      user_profile: {
-        ...userData,
-        roles: userRoles,
-      },
-      learning_activity: {
-        module_subscriptions: subscriptions,
-        course_likes: likes,
-        course_completions: completions,
-      },
-      user_contributions: {
-        owned_modules: ownedModules,
-        owned_courses: ownedCourses,
-        module_comments: comments,
-      },
-      metadata: {
-        total_subscriptions: subscriptions.length,
-        total_likes: likes.length,
-        total_completions: completions.length,
-        total_comments: comments.length,
-        total_owned_modules: ownedModules.length,
-        total_owned_courses: ownedCourses.length,
-      },
-    };
+      // Remove sensitive data
+      const { password_hash, ...userData } = user;
+
+      // Compile complete data export
+      return {
+        export_date: new Date().toISOString(),
+        user_profile: {
+          ...userData,
+          roles: userRoles,
+        },
+        learning_activity: {
+          module_subscriptions: subscriptions,
+          course_likes: likes,
+          course_completions: completions,
+        },
+        user_contributions: {
+          owned_modules: ownedModules,
+          owned_courses: ownedCourses,
+          module_comments: comments,
+        },
+        metadata: {
+          total_subscriptions: subscriptions.length,
+          total_likes: likes.length,
+          total_completions: completions.length,
+          total_comments: comments.length,
+          total_owned_modules: ownedModules.length,
+          total_owned_courses: ownedCourses.length,
+        },
+      };
+    } catch (err) {
+      console.error("Error in exportUserData:", err);
+      throw new ApiError(`Failed to export user data: ${(err as Error).message}`, 500);
+    }
   }
 
   /**
