@@ -140,3 +140,13 @@ export const moduleComments = pgTable("module_comment", {
   created_at: text("created_at").notNull().default("NOW()"),
   updated_at: text("updated_at").notNull().default("NOW()"),
 });
+
+// Module reports table
+export const moduleReports = pgTable("module_report", {
+  id: serial("id").primaryKey(),
+  module_id: integer("module_id").notNull().references(() => modules.id, { onDelete: "cascade" }),
+  reporter_id: integer("reporter_id").references(() => users.id, { onDelete: "set null" }),
+  reason: varchar("reason", { length: 255 }).notNull(),
+  details: text("details"),
+  created_at: text("created_at").notNull().default("NOW()"),
+});
