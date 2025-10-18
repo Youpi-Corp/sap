@@ -73,6 +73,27 @@ export function setupModuleRoutes() {
             },
           },
         }
+      )
+      // Get trending modules (most liked in the past week)
+      .get(
+        "/trending",
+        async () => {
+          // No authentication required for trending modules
+          const modules = await moduleService.getTrendingModules(10);
+          return success(modules);
+        },
+        {
+          detail: {
+            tags: ["Modules"],
+            summary: "Get trending modules",
+            description: "Retrieve the top 10 trending modules based on course likes in the past week",
+            responses: {
+              "200": {
+                description: "Trending modules retrieved successfully",
+              }
+            },
+          },
+        }
       )      // Get module by ID
       .get(
         "/get/:moduleId",
@@ -181,6 +202,33 @@ export function setupModuleRoutes() {
             responses: {
               "200": {
                 description: "Subscribed modules found",
+              },
+              "401": {
+                description: "Authentication required",
+              },
+            },
+          },
+        }
+      )
+      // Get in-progress modules (subscribed but not completed)
+      .get(
+        "/in-progress",
+        async ({ requireAuth }) => {
+          // Get user from JWT token
+          const claims = await requireAuth();
+          const userId = parseInt(claims.sub);
+
+          const modules = await moduleService.getInProgressModules(userId);
+          return success(modules);
+        },
+        {
+          detail: {
+            tags: ["Modules"],
+            summary: "Get in-progress modules",
+            description: "Retrieve all modules the authenticated user has started but not completed",
+            responses: {
+              "200": {
+                description: "In-progress modules found",
               },
               "401": {
                 description: "Authentication required",
