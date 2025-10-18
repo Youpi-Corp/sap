@@ -1,6 +1,6 @@
 import { db } from "../db/client";
 import { modules, moduleSubscriptions, courses } from "../db/schema";
-import { eq, and, count, desc, sql, gte } from "drizzle-orm";
+import { eq, and, count, gte } from "drizzle-orm";
 import { NotFoundError } from "../middleware/error";
 import type { Course } from "./course"; // Import Course type as a type only
 
@@ -450,7 +450,6 @@ export class ModuleService {  /**
       }
 
       // Get completed courses for this user in this module
-      const courseIds = moduleCourses.map(course => course.id);
       const completedCourses = await db
         .select()
         .from(courseCompletions)
