@@ -1,6 +1,6 @@
 import { db } from "../db/client";
 import { modules, moduleSubscriptions, courses } from "../db/schema";
-import { eq, and, count } from "drizzle-orm";
+import { eq, and, count, gte } from "drizzle-orm";
 import { NotFoundError } from "../middleware/error";
 import type { Course } from "./course"; // Import Course type as a type only
 
@@ -423,6 +423,114 @@ export class ModuleService {  /**
       .where(eq(moduleSubscriptions.module_id, moduleId))
       .returning();
     return result.length;
+  }
+
+  /**
+   * Get modules that the user has started but not completed
+   * @param userId User ID
+   * @returns Array of modules with progress
+   */
+  async getInProgressModules(userId: number): Promise<Module[]> {
+    // Get modules the user is subscribed to
+    const subscribedModules = await this.getSubscribedModules(userId);
+
+    // Import courseCompletions to check completion status
+    const { courseCompletions } = await import("../db/schema");
+
+    // For each module, check if all courses are completed
+    const inProgressModules: Module[] = [];
+
+    for (const module of subscribedModules) {
+      // Get all courses in the module
+      const moduleCourses = module.courses || [];
+      
+      if (moduleCourses.length === 0) {
+        // If module has no courses, skip it
+        continue;
+      }
+
+      // Get completed courses for this user in this module
+      const completedCourses = await db
+        .select()
+        .from(courseCompletions)
+        .where(
+          and(
+            eq(courseCompletions.user_id, userId),
+            // Check if course_id is in the list of course IDs
+            // We'll need to check each one individually
+          )
+        );
+
+      // Count how many courses are completed
+      const completedCourseIds = new Set(completedCourses.map(cc => cc.course_id));
+      const completedCount = moduleCourses.filter(course => 
+        completedCourseIds.has(course.id)
+      ).length;
+
+      // If some courses are completed but not all, it's in progress
+      // Or if no courses are completed, it's still in progress (they started by subscribing)
+      if (completedCount < moduleCourses.length) {
+        inProgressModules.push(module);
+      }
+    }
+
+    return inProgressModules;
+  }
+
+  /**
+   * Get trending modules based on course likes in the past week
+   * @param limit Maximum number of modules to return (default: 10)
+   * @returns Array of trending modules sorted by recent like count
+   */
+  async getTrendingModules(limit: number = 10): Promise<Module[]> {
+    // Calculate date from 7 days ago
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const oneWeekAgoStr = oneWeekAgo.toISOString();
+
+    // Import courseLikes to count recent likes
+    const { courseLikes } = await import("../db/schema");
+
+    // Get all public modules with their courses
+    const publicModules = await this.getPublicModules();
+
+    // For each module, count likes from the past week
+    const modulesWithLikeCounts = await Promise.all(
+      publicModules.map(async (module) => {
+        const moduleCourses = module.courses || [];
+        const courseIds = moduleCourses.map(course => course.id);
+
+        if (courseIds.length === 0) {
+          return { module, likeCount: 0 };
+        }
+
+        // Count likes in the past week for all courses in this module
+        let totalLikes = 0;
+        for (const courseId of courseIds) {
+          const likesCount = await db
+            .select({ value: count() })
+            .from(courseLikes)
+            .where(
+              and(
+                eq(courseLikes.course_id, courseId),
+                gte(courseLikes.liked_at, oneWeekAgoStr)
+              )
+            );
+          totalLikes += likesCount[0]?.value || 0;
+        }
+
+        return { module, likeCount: totalLikes };
+      })
+    );
+
+    // Sort by like count (descending) and take top N
+    const trendingModules = modulesWithLikeCounts
+      .filter(item => item.likeCount > 0) // Only include modules with at least 1 like
+      .sort((a, b) => b.likeCount - a.likeCount)
+      .slice(0, limit)
+      .map(item => item.module);
+
+    return trendingModules;
   }
 }
 
