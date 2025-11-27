@@ -265,6 +265,124 @@ export function setupModuleRoutes() {
           },
         }
       )
+      // Check if module is liked by the current user
+      .get(
+        "/has-liked/:moduleId",
+        async ({ params, requireAuth }) => {
+          const claims = await requireAuth();
+          const userId = parseInt(claims.sub);
+          const moduleId = parseInt(params.moduleId, 10);
+
+          const hasLiked = await moduleService.hasUserLikedModule(userId, moduleId);
+          return success({ hasLiked });
+        },
+        {
+          detail: {
+            tags: ["Modules"],
+            summary: "Check module like status",
+            description: "Check if the authenticated user has liked a module",
+            responses: {
+              "200": {
+                description: "Like status retrieved",
+              },
+              "401": {
+                description: "Authentication required",
+              },
+              "404": {
+                description: "Module not found",
+              },
+            },
+          },
+        }
+      )
+      // Like a module
+      .post(
+        "/like/:moduleId",
+        async ({ params, requireAuth }) => {
+          const claims = await requireAuth();
+          const userId = parseInt(claims.sub);
+          const moduleId = parseInt(params.moduleId, 10);
+
+          const liked = await moduleService.likeModule(userId, moduleId);
+          return success({ liked });
+        },
+        {
+          detail: {
+            tags: ["Modules"],
+            summary: "Like a module",
+            description: "Allow the authenticated user to like a specific module",
+            responses: {
+              "200": {
+                description: "Module liked successfully",
+              },
+              "401": {
+                description: "Authentication required",
+              },
+              "404": {
+                description: "Module not found",
+              },
+              "400": {
+                description: "Bad request",
+              },
+            },
+          },
+        }
+      )
+      // Unlike a module
+      .delete(
+        "/unlike/:moduleId",
+        async ({ params, requireAuth }) => {
+          const claims = await requireAuth();
+          const userId = parseInt(claims.sub);
+          const moduleId = parseInt(params.moduleId, 10);
+
+          const unliked = await moduleService.unlikeModule(userId, moduleId);
+          return success({ unliked });
+        },
+        {
+          detail: {
+            tags: ["Modules"],
+            summary: "Unlike a module",
+            description: "Allow the authenticated user to unlike a module",
+            responses: {
+              "200": {
+                description: "Module unliked successfully",
+              },
+              "401": {
+                description: "Authentication required",
+              },
+              "404": {
+                description: "Module not found",
+              },
+            },
+          },
+        }
+      )
+      // Get module likes count
+      .get(
+        "/likes-count/:moduleId",
+        async ({ params }) => {
+          const moduleId = parseInt(params.moduleId, 10);
+          const likesCount = await moduleService.getModuleLikesCount(moduleId);
+
+          return success({ likesCount });
+        },
+        {
+          detail: {
+            tags: ["Modules"],
+            summary: "Get module likes count",
+            description: "Retrieve the number of likes for a module",
+            responses: {
+              "200": {
+                description: "Likes count retrieved",
+              },
+              "404": {
+                description: "Module not found",
+              },
+            },
+          },
+        }
+      )
       // Create a new module
       .post(
         "/create",
