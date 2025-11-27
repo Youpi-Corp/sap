@@ -1,8 +1,9 @@
 import { db } from "../db/client";
-import { modules, moduleSubscriptions, courses } from "../db/schema";
-import { eq, and, count, gte } from "drizzle-orm";
+import { modules, moduleSubscriptions, courses, moduleLikes, courseLikes } from "../db/schema";
+import { eq, and, count, gte, inArray } from "drizzle-orm";
 import { NotFoundError } from "../middleware/error";
 import type { Course } from "./course"; // Import Course type as a type only
+import { reportService } from "./report";
 
 // Module types
 export interface Module {
@@ -15,6 +16,7 @@ export interface Module {
   dtc: string | null; // Date time created
   dtm: string | null; // Date time modified
   courses?: Course[]; // Optional courses array
+  report_count?: number;
 }
 
 export interface NewModule {
@@ -163,7 +165,12 @@ export class ModuleService {  /**
       .where(eq(modules.id, id))
       .returning({ id: modules.id });
 
-    return result.length > 0;
+    if (result.length > 0) {
+      await reportService.deleteReportsForTarget("module", id);
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -351,6 +358,88 @@ export class ModuleService {  /**
   }
 
   /**
+   * User likes a module
+   * @param userId User ID
+   * @param moduleId Module ID
+   * @returns True if like was added
+   */
+  async likeModule(userId: number, moduleId: number): Promise<boolean> {
+    // Ensure module exists
+    await this.getModuleById(moduleId);
+
+    try {
+      const result = await db
+        .insert(moduleLikes)
+        .values({ user_id: userId, module_id: moduleId })
+        .returning();
+      return result.length > 0;
+    } catch (error: unknown) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === "23505"
+      ) {
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * User unlikes a module
+   * @param userId User ID
+   * @param moduleId Module ID
+   * @returns True if unlike succeeded
+   */
+  async unlikeModule(userId: number, moduleId: number): Promise<boolean> {
+    await this.getModuleById(moduleId);
+
+    const result = await db
+      .delete(moduleLikes)
+      .where(
+        and(
+          eq(moduleLikes.user_id, userId),
+          eq(moduleLikes.module_id, moduleId)
+        )
+      )
+      .returning();
+
+    return result.length > 0;
+  }
+
+  /**
+   * Get total likes for a module
+   * @param moduleId Module ID
+   */
+  async getModuleLikesCount(moduleId: number): Promise<number> {
+    await this.getModuleById(moduleId);
+    const result = await db
+      .select({ value: count() })
+      .from(moduleLikes)
+      .where(eq(moduleLikes.module_id, moduleId));
+
+    return result[0]?.value || 0;
+  }
+
+  /**
+   * Check if user liked a module
+   */
+  async hasUserLikedModule(userId: number, moduleId: number): Promise<boolean> {
+    const result = await db
+      .select({ id: moduleLikes.id })
+      .from(moduleLikes)
+      .where(
+        and(
+          eq(moduleLikes.user_id, userId),
+          eq(moduleLikes.module_id, moduleId)
+        )
+      );
+
+    return result.length > 0;
+  }
+
+  /**
    * Get all modules a user is subscribed to
    * @param userId User ID
    * @returns Array of modules
@@ -478,7 +567,7 @@ export class ModuleService {  /**
   }
 
   /**
-   * Get trending modules based on course likes in the past week
+   * Get trending modules based on module + lesson likes in the past week
    * @param limit Maximum number of modules to return (default: 10)
    * @returns Array of trending modules sorted by recent like count
    */
@@ -488,36 +577,39 @@ export class ModuleService {  /**
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
     const oneWeekAgoStr = oneWeekAgo.toISOString();
 
-    // Import courseLikes to count recent likes
-    const { courseLikes } = await import("../db/schema");
-
     // Get all public modules with their courses
     const publicModules = await this.getPublicModules();
 
-    // For each module, count likes from the past week
+    // For each module, count likes from the past week (module likes + lesson likes)
     const modulesWithLikeCounts = await Promise.all(
       publicModules.map(async (module) => {
-        const moduleCourses = module.courses || [];
-        const courseIds = moduleCourses.map(course => course.id);
-
-        if (courseIds.length === 0) {
-          return { module, likeCount: 0 };
-        }
-
-        // Count likes in the past week for all courses in this module
-        let totalLikes = 0;
-        for (const courseId of courseIds) {
-          const likesCount = await db
+        const [moduleLikesResult, lessonLikesResult] = await Promise.all([
+          db
             .select({ value: count() })
-            .from(courseLikes)
+            .from(moduleLikes)
             .where(
               and(
-                eq(courseLikes.course_id, courseId),
-                gte(courseLikes.liked_at, oneWeekAgoStr)
+                eq(moduleLikes.module_id, module.id),
+                gte(moduleLikes.liked_at, oneWeekAgoStr)
               )
-            );
-          totalLikes += likesCount[0]?.value || 0;
-        }
+            ),
+          (module.courses?.length ?? 0) === 0
+            ? Promise.resolve([{ value: 0 }])
+            : db
+                .select({ value: count() })
+                .from(courseLikes)
+                .where(
+                  and(
+                    inArray(
+                      courseLikes.course_id,
+                      (module.courses || []).map((course) => course.id)
+                    ),
+                    gte(courseLikes.liked_at, oneWeekAgoStr)
+                  )
+                ),
+        ]);
+
+        const totalLikes = (moduleLikesResult[0]?.value || 0) + (lessonLikesResult[0]?.value || 0);
 
         return { module, likeCount: totalLikes };
       })
