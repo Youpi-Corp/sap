@@ -3,6 +3,7 @@ import { modules, moduleSubscriptions, courses, moduleLikes, courseLikes } from 
 import { eq, and, count, gte, inArray } from "drizzle-orm";
 import { NotFoundError } from "../middleware/error";
 import type { Course } from "./course"; // Import Course type as a type only
+import { reportService } from "./report";
 
 // Module types
 export interface Module {
@@ -15,6 +16,7 @@ export interface Module {
   dtc: string | null; // Date time created
   dtm: string | null; // Date time modified
   courses?: Course[]; // Optional courses array
+  report_count?: number;
 }
 
 export interface NewModule {
@@ -163,7 +165,12 @@ export class ModuleService {  /**
       .where(eq(modules.id, id))
       .returning({ id: modules.id });
 
-    return result.length > 0;
+    if (result.length > 0) {
+      await reportService.deleteReportsForTarget("module", id);
+      return true;
+    }
+
+    return false;
   }
 
   /**

@@ -2,6 +2,7 @@ import { db } from "../db/client";
 import { moduleComments, modules, users } from "../db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { NotFoundError } from "../middleware/error";
+import { reportService } from "./report";
 
 // Module comment types
 export interface ModuleComment {
@@ -16,6 +17,10 @@ export interface ModuleComment {
     pseudo: string | null;
     profile_picture: string | null;
   } | null;
+}
+
+export interface ModuleCommentWithReports extends ModuleComment {
+  report_count: number;
 }
 
 export interface NewModuleComment {
@@ -159,6 +164,8 @@ export class ModuleCommentService {
       throw new NotFoundError("Comment not found");
     }
 
+    await reportService.deleteReportsForTarget("comment", id);
+
     return true;
   }
 
@@ -208,6 +215,35 @@ export class ModuleCommentService {
       .orderBy(desc(moduleComments.created_at));
 
     return result;
+  }
+
+  async getAllCommentsForAdmin(): Promise<ModuleCommentWithReports[]> {
+    const comments = await db
+      .select({
+        id: moduleComments.id,
+        content: moduleComments.content,
+        user_id: moduleComments.user_id,
+        module_id: moduleComments.module_id,
+        created_at: moduleComments.created_at,
+        updated_at: moduleComments.updated_at,
+        user: {
+          id: users.id,
+          pseudo: users.pseudo,
+          profile_picture: users.profile_picture,
+        },
+      })
+      .from(moduleComments)
+      .leftJoin(users, eq(moduleComments.user_id, users.id))
+      .orderBy(desc(moduleComments.created_at));
+
+    const reportCounts = await reportService.getReportCountsByTargetType(
+      "comment",
+    );
+
+    return comments.map((comment) => ({
+      ...comment,
+      report_count: reportCounts[comment.id] ?? 0,
+    }));
   }
 }
 

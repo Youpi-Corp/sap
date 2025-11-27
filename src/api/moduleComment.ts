@@ -35,6 +35,38 @@ export function setupModuleCommentRoutes() {
           },
         }
       )
+      .get(
+        "/admin",
+        async ({ requireAuth, guardRoles, set }) => {
+          const authResult = guardRoles([ROLES.ADMIN]);
+          if (authResult) {
+            set.status = authResult.statusCode;
+            return authResult;
+          }
+
+          await requireAuth();
+          const comments = await moduleCommentService.getAllCommentsForAdmin();
+          return success(comments);
+        },
+        {
+          detail: {
+            tags: ["Module Comments"],
+            summary: "List all comments (admin)",
+            description: "Retrieve every module comment with aggregated report counts (Admin only)",
+            responses: {
+              "200": {
+                description: "Comments retrieved successfully",
+              },
+              "401": {
+                description: "Authentication required",
+              },
+              "403": {
+                description: "Forbidden - Admin role required",
+              },
+            },
+          },
+        }
+      )
       // Get a single comment by ID
       .get(
         "/comment/:commentId",

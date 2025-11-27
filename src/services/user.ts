@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { hashPassword, verifyPassword } from "../utils/password";
 import { NotFoundError, ApiError } from "../middleware/error";
 import { isValidRole, getDefaultRoles, RoleType } from "../utils/roles";
+import { reportService } from "./report";
 
 // User types
 export interface User {
@@ -18,6 +19,7 @@ export interface User {
   google_id: string | null;
   created_at: string;
   updated_at: string;
+  report_count?: number;
 }
 
 export interface NewUser {
@@ -291,7 +293,12 @@ export class UserService {  /**
       .where(eq(users.id, id))
       .returning({ id: users.id });
 
-    return result.length > 0;
+    if (result.length > 0) {
+      await reportService.deleteReportsForTarget("user", id);
+      return true;
+    }
+
+    return false;
   }
 
   /**
