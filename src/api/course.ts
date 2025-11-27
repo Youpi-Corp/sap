@@ -3,6 +3,7 @@ import { courseService } from "../services/course";
 import { success, error } from "../utils/response";
 import { setupAuth } from "../middleware/auth";
 import { ROLES, PERMISSIONS, hasPermission, hasRole } from "../utils/roles";
+import { reportService } from "../services/report";
 
 /**
  * Setup course routes
@@ -30,8 +31,14 @@ export function setupCourseRoutes() {
           created_at: course.created_at === 'NOW()' || !course.created_at ? now : course.created_at,
           updated_at: course.updated_at === 'NOW()' || !course.updated_at ? now : course.updated_at,
         }));
+
+        const lessonReportCounts = await reportService.getReportCountsByTargetType("lesson");
+        const enrichedCourses = fixedCourses.map(course => ({
+          ...course,
+          report_count: lessonReportCounts[course.id] ?? 0,
+        }));
         
-        return success(fixedCourses);
+        return success(enrichedCourses);
       }, {
       detail: {
         tags: ["Courses"],

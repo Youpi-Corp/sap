@@ -3,6 +3,7 @@ import { userService, type NewUser } from "../services/user"; // Import NewUser 
 import { success, error } from "../utils/response";
 import { setupAuth } from "../middleware/auth";
 import { ROLES } from "../utils/roles";
+import { reportService } from "../services/report";
 
 /**
  * Setup user routes
@@ -224,7 +225,13 @@ export function setupUserRoutes() {
             }
           }));
 
-          return success(safeUsers);
+          const reportCounts = await reportService.getReportCountsByTargetType("user");
+          const safeUsersWithReports = safeUsers.map(user => ({
+            ...user,
+            report_count: reportCounts[user.id] ?? 0,
+          }));
+
+          return success(safeUsersWithReports);
         },
         {
           detail: {

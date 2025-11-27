@@ -5,6 +5,7 @@ import {
   text,
   integer,
   boolean,
+  pgEnum,
 } from "drizzle-orm/pg-core";
 
 // User table
@@ -147,4 +148,44 @@ export const moduleComments = pgTable("module_comment", {
   module_id: integer("module_id").notNull().references(() => modules.id, { onDelete: "cascade" }),
   created_at: text("created_at").notNull().default("NOW()"),
   updated_at: text("updated_at").notNull().default("NOW()"),
+});
+
+export const reportTargetTypeEnum = pgEnum("report_target_type", [
+  "user",
+  "module",
+  "lesson",
+  "comment",
+]);
+
+export const reportReasonEnum = pgEnum("report_reason", [
+  "spam",
+  "harassment",
+  "hate",
+  "nudity",
+  "self_harm",
+  "misinformation",
+  "plagiarism",
+  "other",
+]);
+
+export const reportStatusEnum = pgEnum("report_status", [
+  "pending",
+  "dismissed",
+  "resolved",
+]);
+
+export const reports = pgTable("report", {
+  id: serial("id").primaryKey(),
+  reporter_id: integer("reporter_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  target_type: reportTargetTypeEnum("target_type").notNull(),
+  target_id: integer("target_id").notNull(),
+  reason: reportReasonEnum("reason").notNull(),
+  details: text("details"),
+  status: reportStatusEnum("status").notNull().default("pending"),
+  created_at: text("created_at").notNull().default("NOW()"),
+  updated_at: text("updated_at").notNull().default("NOW()"),
+  resolved_by: integer("resolved_by").references(() => users.id),
+  resolved_at: text("resolved_at"),
 });

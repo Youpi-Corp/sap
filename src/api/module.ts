@@ -5,6 +5,7 @@ import { setupAuth } from "../middleware/auth";
 import { ROLES } from "../utils/roles";
 import { NotFoundError } from "../middleware/error";
 import { courseService } from "../services/course";
+import { reportService } from "../services/report";
 
 /**
  * Setup module routes
@@ -35,7 +36,12 @@ export function setupModuleRoutes() {
             created_at: module.dtc,
             updated_at: module.dtm
           }));
-          return success(mappedModules);
+          const reportCounts = await reportService.getReportCountsByTargetType("module");
+          const enrichedModules = mappedModules.map(module => ({
+            ...module,
+            report_count: reportCounts[module.id] ?? 0,
+          }));
+          return success(enrichedModules);
         },
         {
           detail: {

@@ -2,6 +2,7 @@ import { db } from "../db/client";
 import { courses, modules, courseLikes, courseCompletions } from "../db/schema";
 import { eq, or, count, and } from "drizzle-orm";
 import { NotFoundError } from "../middleware/error";
+import { reportService } from "./report";
 
 // Course types
 export interface Course {
@@ -17,6 +18,7 @@ export interface Course {
   owner_id: number | null;
   created_at: string;
   updated_at: string;
+  report_count?: number;
 }
 
 export interface NewCourse {
@@ -100,7 +102,12 @@ export class CourseService {
   async deleteCourse(id: number): Promise<boolean> {
     const result = await db.delete(courses).where(eq(courses.id, id)).returning();
 
-    return result.length > 0;
+    if (result.length > 0) {
+      await reportService.deleteReportsForTarget("lesson", id);
+      return true;
+    }
+
+    return false;
   }
   /**
    * Get courses by owner ID
@@ -239,6 +246,7 @@ export class CourseService {
     // Update module count if course had a module
     if (result.length > 0 && moduleId !== null) {
       await this.updateModuleCoursesCount(moduleId);
+      await reportService.deleteReportsForTarget("lesson", id);
     }
 
     return result.length > 0;
