@@ -115,6 +115,14 @@ export const moduleSubscriptions = pgTable("module_subscription", {
   subscribed_at: text("subscribed_at").notNull().default("NOW()"),
 });
 
+// Module liked table
+export const moduleLikes = pgTable("module_like", {
+  id: serial("id").primaryKey(),
+  user_id: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  module_id: integer("module_id").notNull().references(() => modules.id, { onDelete: "cascade" }),
+  liked_at: text("liked_at").notNull().default("NOW()"),
+});
+
 // Course liked table
 export const courseLikes = pgTable("course_like", {
   id: serial("id").primaryKey(),
