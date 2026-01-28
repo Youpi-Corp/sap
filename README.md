@@ -1,4 +1,4 @@
-# Brainforest API ("sap") — Friendly Start
+# Brainforest API ("sap") Friendly Start
 
 Hi! If this is your first time on GitHub, you're in the right place. You don’t need to know everything to get this running — just follow the steps and you’ll be fine.
 
