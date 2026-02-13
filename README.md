@@ -1,63 +1,97 @@
-# Brainforest API ("sap") — Friendly Start
+# Brainforest - Sap (Backend)
 
-Hi! If this is your first time on GitHub, you're in the right place. You don’t need to know everything to get this running — just follow the steps and you’ll be fine.
+This is the backend API for the Brainforest application, built with Bun and Elysia.js. It handles business logic, data storage, and authentication.
 
-This repo is the **backend API** for Brainforest. The frontend lives in the **"leaves"** project.
+## Features
 
-## What you need (local run)
+- RESTful API for frontend communication
+- User authentication and session management (JWT-based)
+- CRUD operations for modules, users, and other resources
+- Database integration with Drizzle ORM
 
-- **Bun** (JavaScript runtime)
-- **PostgreSQL** (database)
+## Tech Stack
 
-If you don’t have those yet, that’s okay — install them first, then come back.
+- **Runtime**: [Bun](https://bun.sh/)
+- **Framework**: [Elysia.js](https://elysiajs.com/)
+- **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **ORM**: [Drizzle ORM](https://orm.drizzle.team/)
+- **Database**: [PostgreSQL](https://www.postgresql.org/)
+- **Testing**: [Vitest](https://vitest.dev/)
+- **Linting**: [ESLint](https://eslint.org/)
 
-## Quick start (local)
+## Getting Started
 
-1) **Install dependencies**
+### Prerequisites
 
-```bash
-bun install
-```
+- [Bun](https://bun.sh/)
+- [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/) (for running the database)
 
-2) **Create your environment file**
+### Installation
 
-```bash
-cp .env.example .env
-```
+1.  Navigate to the backend directory:
+    ```sh
+    cd brainforest/sap
+    ```
+2.  Install the dependencies:
+    ```sh
+    bun install
+    ```
 
-3) **Update `.env`** with your database URL and JWT secrets
+### Database Setup
 
-4) **Set up the database**
+1.  Create a `.env` file in the `sap` directory by copying the example:
+    ```sh
+    cp .env.example .env
+    ```
+2.  Update the `DATABASE_URL` in your `.env` file with your database credentials.
+    ```env
+    # .env
+    DATABASE_URL="postgresql://user:password@localhost:5432/brainforest?schema=public"
+    JWT_SECRET="your-super-secret-key"
+    ```
+3.  Start the PostgreSQL database using Docker Compose:
+    ```sh
+    docker-compose up -d
+    ```
+4.  Run the development setup script to apply migrations:
+    ```sh
+    bun run setup
+    ```
 
-```bash
-bun run setup
-```
+### Running the Development Server
 
-5) **Run the API**
+To start the local development server with auto-reloading, run:
 
-```bash
+```sh
 bun run dev
 ```
 
-You should see the API on `http://localhost:8080` and the docs at `http://localhost:8080/swagger`.
+The API will be available at `http://localhost:8080` and the API documentation at `http://localhost:8080/swagger`.
 
-## Deploying (for schools/communities)
+## Available Scripts
 
-If you want to host this for your group, you’ll typically need:
-- A Linux server (VPS)
-- PostgreSQL
-- A way to keep the API running (PM2 or similar)
-- Environment variables set on the server
+- `bun run dev`: Starts the development server with hot-reloading.
+- `bun run build`: Compiles TypeScript and builds the application for production.
+- `bun start`: Starts the production server.
+- `bun run lint`: Lints the codebase using ESLint.
+- `bun run db:migrate`: Applies database migrations.
+- `bun run test:watch`: Runs tests in watch mode.
 
-There’s a more technical guide here: `README-dev.md`.
+## Testing
 
-## Need the dev docs?
+This project uses [Vitest](https://vitest.dev/) for testing. Tests are located in the `src/__tests__` directory.
 
-The full technical README is still here:
-- `README-dev.md`
+To run tests:
+```sh
+bun test
+```
 
-It includes architecture, scripts, migrations, and advanced workflows.
+## Security
 
----
+Security policies and procedures for reporting vulnerabilities are detailed in the root `SECURITY.md` file.
 
-You’ve got this. Start small, get it running locally, then level up when you’re ready.
+## Contributing
+
+Contributions are welcome! Please read our `CONTRIBUTING.md` file for details on our code of conduct and the process for submitting pull requests.
+
+
